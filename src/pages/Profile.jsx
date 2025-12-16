@@ -254,12 +254,16 @@ export default function Profile({ user, dbUser }) {
             <h2 className="text-white text-lg font-bold leading-tight text-center">Профиль</h2>
         </div>
 
-        {/* Profile Card */}
+       {/* Profile Card */}
         <div className="flex flex-col items-center pt-2 relative z-10">
             <div className="relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary to-emerald-600 rounded-full opacity-75 blur"></div>
-                <div className="relative bg-center bg-no-repeat bg-cover rounded-full h-24 w-24 ring-4 ring-[#102216]" 
-                     style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAC502xdtgtUxB0-TaDsDJ2yB-sA5STxZ5K7wUUYSahfcwKfGfNfFTeU4c_3JHlka06UQ7khXYsmdNG2X6qroQodhf5VQ8jhT9bJINpACTXXwCG2tUB6ITSFDOKskXtPka2WPY3TwuJ_qKO4jgL_OriHT8jJYx3rlrKzS8EVmfMf0UnBaAa7ihyJm3W6RQBFR_HsTgJDkf0RHovw-IZmdsezNPGvS-Vx8wux_eDPTFoFC7YPYEHRztsAYNodW3TxrruVco7D5WrMe8u")'}}>
+                {/* РЕАЛЬНОЕ ФОТО */}
+                <div className="relative bg-center bg-no-repeat bg-cover rounded-full h-24 w-24 ring-4 ring-[#102216] flex items-center justify-center bg-[#102216]" 
+                     style={{backgroundImage: user?.photo_url ? `url('${user.photo_url}')` : 'none'}}>
+                     {!user?.photo_url && (
+                        <span className="material-symbols-outlined text-white/30 text-4xl">person</span>
+                     )}
                 </div>
             </div>
             <h2 className="text-white text-xl font-bold mt-4">{user?.first_name || '...'}</h2>
