@@ -17,11 +17,7 @@ function App() {
       tg.expand();
       tg.enableClosingConfirmation();
       
-      const user = tg.initDataUnsafe?.user || { 
-        id: 1332986231, 
-        first_name: "Konstantin (Dev)", 
-        username: "browser_test" 
-      };
+      const user = tg.initDataUnsafe?.user;
       setTgUser(user);
 
       // Сразу загружаем данные из базы при старте
