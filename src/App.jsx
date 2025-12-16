@@ -6,23 +6,31 @@ import Profile from './pages/Profile';
 
 function App() {
   const [activeTab, setActiveTab] = useState('home');
-  // tgUser - данные от Телеграма (ID, Username)
   const [tgUser, setTgUser] = useState(null);
-  // dbUser - данные из нашей Базы (Баллы, Статус, Адрес)
   const [dbUser, setDbUser] = useState(null);
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
+    // Безопасная проверка наличия Telegram WebApp
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      const tg = window.Telegram.WebApp;
+      
+      // Сообщаем Телеграму, что приложение готово
+      tg.ready();
       tg.expand();
       tg.enableClosingConfirmation();
       
+      // Получаем РЕАЛЬНЫЕ данные. Никаких заглушек.
       const user = tg.initDataUnsafe?.user;
-      setTgUser(user);
 
-      // Сразу загружаем данные из базы при старте
-      initUserInDB(user);
-      
+      if (user) {
+        setTgUser(user);
+        // Инициализируем в базе
+        initUserInDB(user);
+      } else {
+        // Если открыто не в Телеграме или данные не пришли
+        console.warn("Нет данных пользователя Telegram. Webhook не будет отправлен.");
+      }
+
       // Хак для клавиатуры
       const handleFocus = () => document.body.classList.add('keyboard-open');
       const handleBlur = () => document.body.classList.remove('keyboard-open');
@@ -35,24 +43,38 @@ function App() {
   }, []);
 
   const initUserInDB = async (userData) => {
+    // Проверка на всякий случай
+    if (!userData || !userData.id) return;
+
     try {
-        const API_URL = 'https://proshein.com/webhook/init-user'; 
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        tg_id: userData.id,
-                        first_name: userData.first_name,
-                        username: userData.username
+        const res = await fetch('https://proshein.com/webhook/init-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tg_id: userData.id,
+                first_name: userData.first_name,
+                username: userData.username,
+                language_code: userData.language_code,
+                is_premium: userData.is_premium
             })
         });
+        
+        if (!res.ok) {
+            throw new Error(`HTTP Error: ${res.status}`);
+        }
+
         const json = await res.json();
+        
         if (json.status === 'success') {
-            // Сохраняем полные данные о юзере (включая баллы)
+            console.log("User initialized:", json.data);
             setDbUser(json.data);
+        } else {
+            console.error("Init Error:", json);
         }
     } catch (e) {
-        console.error("Ошибка авторизации:", e);
+        console.error("Ошибка авторизации (Network/CORS):", e);
+        // Можно включить алерт для отладки, если совсем тишина
+        // window.Telegram?.WebApp?.showAlert(`Ошибка init-user: ${e.message}`);
     }
   };
 
@@ -61,7 +83,6 @@ function App() {
       <div className="fixed inset-0 pointer-events-none bg-luxury-gradient z-0"></div>
 
       <div className="relative z-10 pb-24">
-        {/* Передаем dbUser во все компоненты, чтобы везде были актуальные баллы */}
         {activeTab === 'home' && <Home user={tgUser} dbUser={dbUser} setActiveTab={setActiveTab} />}
         {activeTab === 'cart' && <Cart user={tgUser} dbUser={dbUser} setActiveTab={setActiveTab} />}
         {activeTab === 'profile' && <Profile user={tgUser} dbUser={dbUser} />}
