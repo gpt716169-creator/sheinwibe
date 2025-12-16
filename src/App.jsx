@@ -36,13 +36,14 @@ function App() {
 
   const initUserInDB = async (userData) => {
     try {
-        const res = await fetch('https://proshein.com/webhook/init-user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                tg_id: userData.id,
-                first_name: userData.first_name,
-                username: userData.username
+        const API_URL = 'https://proshein.com/webhook/init-user'; 
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tg_id: userData.id,
+                        first_name: userData.first_name,
+                        username: userData.username
             })
         });
         const json = await res.json();
