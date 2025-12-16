@@ -135,21 +135,24 @@ export default function Home({ user, dbUser, setActiveTab }) {
   };
 
   return (
-    <div className="flex flex-col h-full pb-24 animate-fade-in">
-      
-      {/* Header */}
+{/* Header */}
       <div className="relative z-10 flex items-center justify-between p-6 pt-8 pb-2">
         <div className="flex items-center gap-3">
           <div className="relative">
+            {/* ИСПОЛЬЗУЕМ РЕАЛЬНОЕ ФОТО ИЛИ ЗАГЛУШКУ, ЕСЛИ ФОТО НЕТ */}
             <div 
               className="bg-center bg-no-repeat bg-cover rounded-full w-12 h-12 ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-900/50" 
-              style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAC502xdtgtUxB0-TaDsDJ2yB-sA5STxZ5K7wUUYSahfcwKfGfNfFTeU4c_3JHlka06UQ7khXYsmdNG2X6qroQodhf5VQ8jhT9bJINpACTXXwCG2tUB6ITSFDOKskXtPka2WPY3TwuJ_qKO4jgL_OriHT8jJYx3rlrKzS8EVmfMf0UnBaAa7ihyJm3W6RQBFR_HsTgJDkf0RHovw-IZmdsezNPGvS-Vx8wux_eDPTFoFC7YPYEHRztsAYNodW3TxrruVco7D5WrMe8u")' }}
-            ></div>
+              style={{ backgroundImage: user?.photo_url ? `url('${user.photo_url}')` : 'none', backgroundColor: '#102216' }}
+            >
+                {!user?.photo_url && (
+                    <span className="material-symbols-outlined text-white/50 flex items-center justify-center w-full h-full text-xl">person</span>
+                )}
+            </div>
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary border-2 border-[#101622] rounded-full"></div>
           </div>
           <div className="flex flex-col">
             <span className="text-primary/80 text-xs font-medium tracking-widest uppercase">Добро пожаловать</span>
-            <h2 className="text-white text-xl font-light leading-tight tracking-wide">{user?.first_name || '...'}</h2>
+            <h2 className="text-white text-xl font-light leading-tight tracking-wide">{user?.first_name || 'Гость'}</h2>
           </div>
         </div>
         <button 
