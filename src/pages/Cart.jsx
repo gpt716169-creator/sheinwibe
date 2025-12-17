@@ -27,8 +27,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
 
   // UI State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  
-  // --- STATE РЕДАКТИРОВАНИЯ ТОВАРА ---
   const [editingItem, setEditingItem] = useState(null);
   const [tempSize, setTempSize] = useState(null);
   const [tempColor, setTempColor] = useState(null);
@@ -78,37 +76,22 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   const searchPvz = async (q) => {
       setLoadingPvz(true);
       try {
-          console.log("Запрос поиска:", q);
+          // Ищем
           const res = await fetch(`https://proshein.com/webhook/search-pvz?q=${encodeURIComponent(q)}`);
-          
           const rawData = await res.json();
-          console.log("Ответ сервера (raw):", rawData);
-
+          
+          // Парсим любой формат ответа
           let list = [];
+          if (Array.isArray(rawData)) list = rawData;
+          else if (rawData?.json && Array.isArray(rawData.json)) list = rawData.json;
+          else if (rawData?.data && Array.isArray(rawData.data)) list = rawData.data;
+          else if (rawData?.rows && Array.isArray(rawData.rows)) list = rawData.rows;
 
-          // 1. Если пришел чистый массив (как ты прислал в чат)
-          if (Array.isArray(rawData)) {
-              list = rawData;
-          } 
-          // 2. Если массив спрятан внутри ключа "json" (стандарт n8n Code node)
-          else if (rawData && Array.isArray(rawData.json)) {
-              list = rawData.json;
-          }
-          // 3. Другие варианты (data, rows, items)
-          else if (rawData && Array.isArray(rawData.data)) {
-              list = rawData.data;
-          } else if (rawData && Array.isArray(rawData.rows)) {
-              list = rawData.rows;
-          }
-
-          console.log("Распознанный список:", list);
           setPvzResults(list);
-
-      } catch (e) {
-          console.error("Ошибка поиска:", e);
-          // Не показываем алерт на каждый чих, просто пишем в консоль
-      } finally {
-          setLoadingPvz(false);
+      } catch (e) { 
+          console.error(e); 
+      } finally { 
+          setLoadingPvz(false); 
       }
   };
 
@@ -126,63 +109,33 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       await fetch('https://proshein.com/webhook/delete-item', { method: 'POST', body: JSON.stringify({ id, tg_id: user?.id }) });
   };
 
-  // --- ОТКРЫТИЕ МОДАЛКИ РЕДАКТИРОВАНИЯ ---
+  // --- EDIT ITEM ---
   const openEditModal = (item) => {
       setEditingItem(item);
       setTempSize(item.size === 'NOT_SELECTED' ? null : item.size);
       setTempColor(item.color);
   };
 
-  // --- СОХРАНЕНИЕ ПАРАМЕТРОВ (В БАЗУ) ---
   const saveItemParams = async () => {
-      if (!tempSize) {
-          window.Telegram?.WebApp?.showAlert('Выберите размер!');
-          return;
-      }
-      
+      if (!tempSize) { window.Telegram?.WebApp?.showAlert('Выберите размер!'); return; }
       setSavingItem(true);
-
-      // 1. Оптимистичное обновление (сразу меняем на экране)
-      setItems(prev => prev.map(i => {
-          if (i.id === editingItem.id) {
-              return { ...i, size: tempSize, color: tempColor };
-          }
-          return i;
-      }));
-
-      // 2. Отправляем в базу
+      setItems(prev => prev.map(i => i.id === editingItem.id ? { ...i, size: tempSize, color: tempColor } : i));
       try {
-          const res = await fetch('https://proshein.com/webhook/update-cart-item', {
+          await fetch('https://proshein.com/webhook/update-cart-item', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  id: editingItem.id,
-                  size: tempSize,
-                  color: tempColor,
-                  tg_id: user?.id
-              })
+              body: JSON.stringify({ id: editingItem.id, size: tempSize, color: tempColor, tg_id: user?.id })
           });
-          const json = await res.json();
-          if(json.status === 'success') {
-             window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
-          } else {
-             throw new Error("API Error");
-          }
-      } catch (e) {
-          console.error("Save error:", e);
-          window.Telegram?.WebApp?.showAlert("Ошибка сохранения в базу, но в приложении обновлено");
-      } finally {
-          setSavingItem(false);
-          setEditingItem(null); // Закрываем модалку
-      }
+      } catch (e) { console.error(e); } 
+      finally { setSavingItem(false); setEditingItem(null); }
   };
 
+  // --- PAY ---
   const handlePay = async () => {
       if (items.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
           window.Telegram?.WebApp?.showAlert('Выберите размер для всех товаров!');
           return;
       }
-
       if (!contactForm.name || !contactForm.phone) { window.Telegram?.WebApp?.showAlert('Заполните контакты'); return; }
       if (!contactForm.agreed || !contactForm.customsAgreed) { window.Telegram?.WebApp?.showAlert('Примите соглашения'); return; }
       
@@ -257,9 +210,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                       />
                   ))}
               </div>
-              
               <div className="h-px bg-white/5 my-4"></div>
-
               <PaymentBlock 
                   subtotal={subtotal} 
                   total={finalTotal} 
@@ -277,13 +228,15 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       {/* --- CHECKOUT MODAL --- */}
       {isCheckoutOpen && (
           <div className="fixed inset-0 z-50 bg-[#101622] flex flex-col animate-slide-up">
-              <div className="flex items-center justify-between p-6 border-b border-white/5">
+              {/* Шапка модалки */}
+              <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[#101622] sticky top-0 z-10">
                   <button onClick={() => setIsCheckoutOpen(false)} className="text-white/50">Назад</button>
                   <h2 className="text-white font-bold">Оформление</h2>
                   <div className="w-10"></div>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  {/* КОНТАКТЫ */}
+              
+              {/* Скроллящийся контент */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-20">
                   <div className="space-y-3">
                       <h3 className="text-[10px] uppercase font-bold text-white/50">Получатель</h3>
                       <input className="custom-input w-full rounded-xl px-4 py-3 text-sm" placeholder="ФИО" value={contactForm.name} onChange={e => setContactForm({...contactForm, name: e.target.value})} />
@@ -291,7 +244,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                       <input className="custom-input w-full rounded-xl px-4 py-3 text-sm" placeholder="Email" type="email" value={contactForm.email} onChange={e => setContactForm({...contactForm, email: e.target.value})} />
                   </div>
 
-                  {/* АДРЕС (Компонент) */}
                   <div className="space-y-3">
                       <h3 className="text-[10px] uppercase font-bold text-white/50">Доставка</h3>
                       <AddressBlock 
@@ -310,7 +262,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                       />
                   </div>
 
-                  {/* СОГЛАШЕНИЯ */}
                   <div className="space-y-2 pt-2">
                       <label className="flex gap-3 items-center">
                           <input type="checkbox" checked={contactForm.agreed} onChange={e => setContactForm({...contactForm, agreed: e.target.checked})} className="rounded bg-white/10 border-white/20 text-primary" />
@@ -321,35 +272,30 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                           <span className="text-xs text-white/60">Паспорт для таможни</span>
                       </label>
                   </div>
-              </div>
 
-              <div className="p-6 border-t border-white/10 bg-[#101622]">
-                  <button onClick={handlePay} className="w-full h-14 bg-primary text-[#102216] font-bold rounded-xl text-lg">
-                      Подтвердить {finalTotal.toLocaleString()} ₽
-                  </button>
+                  {/* КНОПКА ПОДТВЕРДИТЬ - ТЕПЕРЬ ОНА В ПОТОКЕ */}
+                  <div className="pt-4">
+                      <button onClick={handlePay} className="w-full h-14 bg-primary text-[#102216] font-bold rounded-xl text-lg shadow-lg">
+                          Подтвердить {finalTotal.toLocaleString()} ₽
+                      </button>
+                  </div>
               </div>
           </div>
       )}
 
-      {/* --- МОДАЛКА РЕДАКТИРОВАНИЯ (ЦЕНТРАЛЬНАЯ) --- */}
+      {/* --- EDIT MODAL (CENTERED) --- */}
       {editingItem && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setEditingItem(null)}>
                <div className="bg-[#151c28] w-full max-w-sm rounded-2xl border border-white/10 overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-                   
-                   {/* Компактная шапка */}
                    <div className="flex gap-4 p-5 border-b border-white/5 bg-[#1a2332]">
                        <div className="w-16 h-20 rounded-lg bg-cover bg-center shrink-0 bg-white/5 border border-white/10 shadow-sm" style={{backgroundImage: `url('${editingItem.image_url}')`}}></div>
                        <div className="flex flex-col justify-center pr-4">
                            <h3 className="text-white font-bold text-sm leading-tight line-clamp-2">{editingItem.product_name}</h3>
                            <p className="text-white/40 text-xs mt-1">Выберите параметры</p>
                        </div>
-                       <button onClick={() => setEditingItem(null)} className="absolute top-4 right-4 text-white/30 hover:text-white">
-                           <span className="material-symbols-outlined text-lg">close</span>
-                       </button>
+                       <button onClick={() => setEditingItem(null)} className="absolute top-4 right-4 text-white/30 hover:text-white"><span className="material-symbols-outlined text-lg">close</span></button>
                    </div>
-
                    <div className="p-5 flex-1 space-y-5">
-                       {/* Размер */}
                        <div>
                            <div className="flex justify-between items-center mb-2">
                                <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold">Размер</h4>
@@ -358,51 +304,23 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                            <div className="flex flex-wrap gap-2">
                                {(() => {
                                    let options = [];
-                                   try {
-                                       options = typeof editingItem.size_options === 'string' ? JSON.parse(editingItem.size_options) : (editingItem.size_options || []);
-                                   } catch (e) { options = []; }
-
+                                   try { options = typeof editingItem.size_options === 'string' ? JSON.parse(editingItem.size_options) : (editingItem.size_options || []); } catch (e) {}
                                    if (options.length === 0) return <p className="text-white/30 text-xs">Нет вариантов</p>;
-
                                    return options.map((opt, idx) => (
-                                       <button 
-                                           key={idx} 
-                                           onClick={() => setTempSize(opt.name)}
-                                           className={`h-9 px-3 min-w-[40px] rounded-lg border text-xs font-bold transition-all ${
-                                               tempSize === opt.name 
-                                               ? 'bg-white text-black border-white shadow-lg scale-105' 
-                                               : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                                           }`}
-                                       >
-                                           {opt.name}
-                                       </button>
+                                       <button key={idx} onClick={() => setTempSize(opt.name)} className={`h-9 px-3 min-w-[40px] rounded-lg border text-xs font-bold transition-all ${tempSize === opt.name ? 'bg-white text-black border-white shadow-lg scale-105' : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`}>{opt.name}</button>
                                    ));
                                })()}
                            </div>
                        </div>
-
-                       {/* Цвет */}
                        <div>
                            <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold mb-2">Цвет</h4>
-                           <div 
-                               className={`w-10 h-10 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${
-                                   tempColor === editingItem.color ? 'border-primary ring-2 ring-primary/30 scale-110' : 'border-white/10'
-                               }`}
-                               style={{backgroundColor: editingItem.color?.toLowerCase() === 'white' ? '#fff' : editingItem.color}}
-                               onClick={() => setTempColor(editingItem.color)}
-                           >
+                           <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${tempColor === editingItem.color ? 'border-primary ring-2 ring-primary/30 scale-110' : 'border-white/10'}`} style={{backgroundColor: editingItem.color?.toLowerCase() === 'white' ? '#fff' : editingItem.color}} onClick={() => setTempColor(editingItem.color)}>
                                {tempColor === editingItem.color && <span className="material-symbols-outlined text-xs text-black/50 font-bold">check</span>}
                            </div>
                        </div>
                    </div>
-
-                   {/* Кнопка */}
                    <div className="p-5 pt-2 bg-[#151c28]">
-                       <button 
-                           onClick={saveItemParams} 
-                           disabled={savingItem}
-                           className="w-full h-12 bg-primary text-[#102216] font-bold rounded-xl text-sm uppercase tracking-wide shadow-[0_0_20px_rgba(19,236,91,0.3)] active:scale-[0.98] transition-transform disabled:opacity-50"
-                       >
+                       <button onClick={saveItemParams} disabled={savingItem} className="w-full h-12 bg-primary text-[#102216] font-bold rounded-xl text-sm uppercase tracking-wide shadow-[0_0_20px_rgba(19,236,91,0.3)] active:scale-[0.98] transition-transform disabled:opacity-50">
                            {savingItem ? 'Сохранение...' : 'Применить'}
                        </button>
                    </div>
