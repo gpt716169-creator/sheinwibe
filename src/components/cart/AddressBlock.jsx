@@ -12,12 +12,12 @@ export default function AddressBlock({
     selectedPvz, 
     setSelectedPvz,
     loadingPvz,
-    onOpenProfile // Чтобы отправить юзера добавлять адрес в профиль
+    onOpenProfile
 }) {
 
   return (
     <div className="space-y-4">
-        {/* Переключатель доставки */}
+        {/* Переключатель */}
         <div className="flex gap-2 p-1 bg-white/5 rounded-xl">
            <button 
                onClick={() => setDeliveryMethod('ПВЗ (5Post)')}
@@ -33,7 +33,7 @@ export default function AddressBlock({
            </button>
         </div>
 
-        {/* --- ЛОГИКА 5POST --- */}
+        {/* --- 5POST --- */}
         {deliveryMethod === 'ПВЗ (5Post)' && (
             <div className="animate-fade-in space-y-3">
                 {!selectedPvz ? (
@@ -47,20 +47,29 @@ export default function AddressBlock({
                         />
                         {loadingPvz && <div className="absolute right-3 top-3.5"><span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span></div>}
                         
-                        {/* Результаты поиска */}
+                        {/* СПИСОК РЕЗУЛЬТАТОВ (ТЕПЕРЬ СТАТИЧНЫЙ) */}
                         {pvzResults.length > 0 && (
-                            <div className="mt-2 bg-[#1c2636] border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto absolute z-50 w-full shadow-2xl shadow-black">
+                            <div className="mt-2 bg-[#1c2636] border border-white/10 rounded-xl overflow-hidden animate-fade-in">
                                 {pvzResults.map(pvz => (
-                                    <div key={pvz.id} onClick={() => setSelectedPvz(pvz)} className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer">
-                                        <p className="text-white text-sm font-bold">{pvz.city}, {pvz.address}</p>
-                                        <p className="text-white/50 text-[10px]">{pvz.name}</p>
+                                    <div 
+                                        key={pvz.id} 
+                                        onClick={() => setSelectedPvz(pvz)} 
+                                        className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer active:bg-white/10 transition-colors"
+                                    >
+                                        <p className="text-white text-sm font-bold leading-tight">{pvz.city}, {pvz.address}</p>
+                                        <p className="text-white/50 text-[10px] mt-1">{pvz.name}</p>
                                     </div>
                                 ))}
                             </div>
                         )}
+                        
+                        {/* Подсказка если ничего не найдено, но введен текст */}
+                        {pvzResults.length === 0 && pvzQuery.length > 2 && !loadingPvz && (
+                            <div className="text-center text-white/30 text-xs mt-2">Ничего не найдено</div>
+                        )}
                     </div>
                 ) : (
-                    <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl flex justify-between items-center">
+                    <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl flex justify-between items-center animate-fade-in">
                         <div>
                             <p className="text-primary text-[10px] font-bold uppercase mb-1">Выбран пункт:</p>
                             <p className="text-white text-sm font-medium leading-snug">{selectedPvz.city}, {selectedPvz.address}</p>
@@ -74,7 +83,7 @@ export default function AddressBlock({
             </div>
         )}
 
-        {/* --- ЛОГИКА КУРЬЕРА --- */}
+        {/* --- ПОЧТА РФ --- */}
         {deliveryMethod === 'Почта РФ' && (
             <div className="animate-fade-in space-y-3">
                 {addresses.length > 0 ? (
