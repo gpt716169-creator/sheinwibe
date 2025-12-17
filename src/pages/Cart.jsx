@@ -32,6 +32,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   const [editingItem, setEditingItem] = useState(null);
   const [tempSize, setTempSize] = useState(null);
   const [tempColor, setTempColor] = useState(null);
+  const [savingItem, setSavingItem] = useState(false);
 
   const userPointsBalance = dbUser?.points || 0;
 
@@ -104,14 +105,16 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       setTempColor(item.color);
   };
 
-  // --- СОХРАНЕНИЕ ПАРАМЕТРОВ ---
+  // --- СОХРАНЕНИЕ ПАРАМЕТРОВ (В БАЗУ) ---
   const saveItemParams = async () => {
       if (!tempSize) {
           window.Telegram?.WebApp?.showAlert('Выберите размер!');
           return;
       }
       
-      // Обновляем локально
+      setSavingItem(true);
+
+      // 1. Оптимистичное обновление (сразу меняем на экране)
       setItems(prev => prev.map(i => {
           if (i.id === editingItem.id) {
               return { ...i, size: tempSize, color: tempColor };
@@ -119,14 +122,29 @@ export default function Cart({ user, dbUser, setActiveTab }) {
           return i;
       }));
 
-      // Тут можно добавить запрос к API для сохранения выбора в базе (webhook/update-cart-item)
-      // await fetch(...) 
-
-      setEditingItem(null);
+      // 2. Отправляем в базу
+      try {
+          await fetch('https://proshein.com/webhook/update-cart-item', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  id: editingItem.id,
+                  size: tempSize,
+                  color: tempColor,
+                  tg_id: user?.id
+              })
+          });
+          window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
+      } catch (e) {
+          console.error("Save error:", e);
+          window.Telegram?.WebApp?.showAlert("Ошибка сохранения в базу");
+      } finally {
+          setSavingItem(false);
+          setEditingItem(null); // Закрываем модалку
+      }
   };
 
   const handlePay = async () => {
-      // Проверка размеров
       if (items.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
           window.Telegram?.WebApp?.showAlert('Выберите размер для всех товаров!');
           return;
@@ -174,9 +192,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
               setIsCheckoutOpen(false); 
               setItems([]);
               setActiveTab('home');
-          } else {
-              throw new Error(json.message);
-          }
+          } else { throw new Error(json.message); }
       } catch (e) {
           window.Telegram?.WebApp?.showAlert('Ошибка: ' + e.message);
       } finally {
@@ -282,34 +298,35 @@ export default function Cart({ user, dbUser, setActiveTab }) {
           </div>
       )}
 
-      {/* --- МОДАЛКА ВЫБОРА РАЗМЕРА И ЦВЕТА --- */}
+      {/* --- МОДАЛКА РЕДАКТИРОВАНИЯ (КОМПАКТНАЯ) --- */}
       {editingItem && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setEditingItem(null)}>
-               <div className="bg-[#151c28] w-full max-w-sm rounded-2xl border border-white/10 overflow-hidden flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4 animate-fade-in bg-black/80 backdrop-blur-sm" onClick={() => setEditingItem(null)}>
+               <div className="bg-[#151c28] w-full max-w-sm rounded-t-3xl sm:rounded-2xl border-t sm:border border-white/10 overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
                    
-                   {/* Картинка товара сверху */}
-                   <div className="relative h-40 w-full shrink-0">
-                       <div className="absolute inset-0 bg-cover bg-center" style={{backgroundImage: `url('${editingItem.image_url}')`}}></div>
-                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#151c28]"></div>
-                       <button onClick={() => setEditingItem(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/30 flex items-center justify-center text-white">
-                           <span className="material-symbols-outlined text-sm">close</span>
+                   {/* Компактная шапка: Картинка + Название */}
+                   <div className="flex gap-4 p-5 border-b border-white/5 bg-[#1a2332]">
+                       <div className="w-16 h-20 rounded-lg bg-cover bg-center shrink-0 bg-white/5 border border-white/10 shadow-sm" style={{backgroundImage: `url('${editingItem.image_url}')`}}></div>
+                       <div className="flex flex-col justify-center pr-4">
+                           <h3 className="text-white font-bold text-sm leading-tight line-clamp-2">{editingItem.product_name}</h3>
+                           <p className="text-white/40 text-xs mt-1">Выберите параметры</p>
+                       </div>
+                       <button onClick={() => setEditingItem(null)} className="absolute top-4 right-4 text-white/30 hover:text-white">
+                           <span className="material-symbols-outlined text-lg">close</span>
                        </button>
                    </div>
 
-                   <div className="p-6 flex-1 overflow-y-auto">
-                       <h3 className="text-white font-bold text-sm mb-4 line-clamp-2">{editingItem.product_name}</h3>
-
-                       {/* ВЫБОР РАЗМЕРА */}
-                       <div className="mb-6">
-                           <h4 className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-3">Размер</h4>
+                   <div className="p-5 flex-1 space-y-5">
+                       {/* Размер */}
+                       <div>
+                           <div className="flex justify-between items-center mb-2">
+                               <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold">Размер</h4>
+                               <span className="text-primary text-[10px] font-bold">{tempSize || 'Не выбран'}</span>
+                           </div>
                            <div className="flex flex-wrap gap-2">
                                {(() => {
-                                   // Парсим размеры. В базе это JSON, но n8n мог вернуть уже объект или строку.
                                    let options = [];
                                    try {
-                                       options = typeof editingItem.size_options === 'string' 
-                                           ? JSON.parse(editingItem.size_options) 
-                                           : (editingItem.size_options || []);
+                                       options = typeof editingItem.size_options === 'string' ? JSON.parse(editingItem.size_options) : (editingItem.size_options || []);
                                    } catch (e) { options = []; }
 
                                    if (options.length === 0) return <p className="text-white/30 text-xs">Нет вариантов</p>;
@@ -318,9 +335,9 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                                        <button 
                                            key={idx} 
                                            onClick={() => setTempSize(opt.name)}
-                                           className={`min-w-[40px] h-10 px-3 rounded-lg border text-xs font-bold transition-all ${
+                                           className={`h-9 px-3 min-w-[40px] rounded-lg border text-xs font-bold transition-all ${
                                                tempSize === opt.name 
-                                               ? 'bg-primary text-[#102216] border-primary scale-105 shadow-lg shadow-primary/20' 
+                                               ? 'bg-white text-black border-white shadow-lg scale-105' 
                                                : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
                                            }`}
                                        >
@@ -331,30 +348,29 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                            </div>
                        </div>
 
-                       {/* ВЫБОР ЦВЕТА (Если есть опции, иначе показываем текущий) */}
-                       <div className="mb-4">
-                           <h4 className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-3">Цвет</h4>
-                           <div className="flex gap-3">
-                               {/* В этом макете мы просто показываем текущий цвет, так как у Shein цвет = другой товар обычно.
-                                   Но если бы был массив цветов, мы бы его тут отрендерили так же, как размеры. */}
-                               <div 
-                                   className={`w-10 h-10 rounded-full border-2 flex items-center justify-center cursor-pointer ${
-                                       tempColor === editingItem.color ? 'border-primary ring-2 ring-primary/30' : 'border-white/10'
-                                   }`}
-                                   style={{backgroundColor: editingItem.color?.toLowerCase() === 'white' ? '#fff' : editingItem.color}}
-                                   onClick={() => setTempColor(editingItem.color)}
-                               >
-                                   {tempColor === editingItem.color && <span className="material-symbols-outlined text-xs text-black/50 font-bold">check</span>}
-                               </div>
+                       {/* Цвет */}
+                       <div>
+                           <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold mb-2">Цвет</h4>
+                           <div 
+                               className={`w-10 h-10 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${
+                                   tempColor === editingItem.color ? 'border-primary ring-2 ring-primary/30 scale-110' : 'border-white/10'
+                               }`}
+                               style={{backgroundColor: editingItem.color?.toLowerCase() === 'white' ? '#fff' : editingItem.color}}
+                               onClick={() => setTempColor(editingItem.color)}
+                           >
+                               {tempColor === editingItem.color && <span className="material-symbols-outlined text-xs text-black/50 font-bold">check</span>}
                            </div>
-                           <p className="text-white/50 text-xs mt-2">{editingItem.color}</p>
                        </div>
                    </div>
 
-                   {/* КНОПКА СОХРАНИТЬ */}
-                   <div className="p-4 border-t border-white/5">
-                       <button onClick={saveItemParams} className="w-full h-12 bg-primary text-[#102216] font-bold rounded-xl text-sm uppercase tracking-wide shadow-lg shadow-primary/20">
-                           Сохранить
+                   {/* Кнопка */}
+                   <div className="p-5 pt-2 bg-[#151c28]">
+                       <button 
+                           onClick={saveItemParams} 
+                           disabled={savingItem}
+                           className="w-full h-12 bg-primary text-[#102216] font-bold rounded-xl text-sm uppercase tracking-wide shadow-[0_0_20px_rgba(19,236,91,0.3)] active:scale-[0.98] transition-transform disabled:opacity-50"
+                       >
+                           {savingItem ? 'Сохранение...' : 'Применить'}
                        </button>
                    </div>
                </div>
