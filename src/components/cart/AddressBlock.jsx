@@ -17,7 +17,7 @@ export default function AddressBlock({
 
   return (
     <div className="space-y-4">
-        {/* Переключатель */}
+        {/* Переключатель доставки */}
         <div className="flex gap-2 p-1 bg-white/5 rounded-xl">
            <button 
                onClick={() => setDeliveryMethod('ПВЗ (5Post)')}
@@ -33,7 +33,7 @@ export default function AddressBlock({
            </button>
         </div>
 
-        {/* --- 5POST --- */}
+        {/* --- ЛОГИКА 5POST --- */}
         {deliveryMethod === 'ПВЗ (5Post)' && (
             <div className="animate-fade-in space-y-3">
                 {!selectedPvz ? (
@@ -47,7 +47,7 @@ export default function AddressBlock({
                         />
                         {loadingPvz && <div className="absolute right-3 top-3.5"><span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span></div>}
                         
-                        {/* СПИСОК РЕЗУЛЬТАТОВ (ТЕПЕРЬ СТАТИЧНЫЙ) */}
+                        {/* СПИСОК РЕЗУЛЬТАТОВ (Статичный, сдвигает контент вниз) */}
                         {pvzResults.length > 0 && (
                             <div className="mt-2 bg-[#1c2636] border border-white/10 rounded-xl overflow-hidden animate-fade-in">
                                 {pvzResults.map(pvz => (
@@ -63,7 +63,7 @@ export default function AddressBlock({
                             </div>
                         )}
                         
-                        {/* Подсказка если ничего не найдено, но введен текст */}
+                        {/* Сообщение "Ничего не найдено" */}
                         {pvzResults.length === 0 && pvzQuery.length > 2 && !loadingPvz && (
                             <div className="text-center text-white/30 text-xs mt-2">Ничего не найдено</div>
                         )}
@@ -83,7 +83,7 @@ export default function AddressBlock({
             </div>
         )}
 
-        {/* --- ПОЧТА РФ --- */}
+        {/* --- ЛОГИКА ПОЧТЫ РФ --- */}
         {deliveryMethod === 'Почта РФ' && (
             <div className="animate-fade-in space-y-3">
                 {addresses.length > 0 ? (
