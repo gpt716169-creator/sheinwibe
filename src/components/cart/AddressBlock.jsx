@@ -17,13 +17,13 @@ export default function AddressBlock({
 
   return (
     <div className="space-y-4">
-        {/* Переключатель доставки */}
+        {/* Переключатель */}
         <div className="flex gap-2 p-1 bg-white/5 rounded-xl">
            <button 
                onClick={() => setDeliveryMethod('ПВЗ (5Post)')}
                className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${deliveryMethod === 'ПВЗ (5Post)' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'}`}
            >
-               📦 5Post (Пятерочка)
+               📦 5Post
            </button>
            <button 
                onClick={() => setDeliveryMethod('Почта РФ')}
@@ -33,28 +33,28 @@ export default function AddressBlock({
            </button>
         </div>
 
-        {/* --- ЛОГИКА 5POST --- */}
+        {/* 5POST */}
         {deliveryMethod === 'ПВЗ (5Post)' && (
             <div className="animate-fade-in space-y-3">
                 {!selectedPvz ? (
                     <div className="relative">
                         <span className="material-symbols-outlined absolute left-3 top-3.5 text-white/40">search</span>
                         <input 
-                           className="custom-input w-full rounded-xl pl-10 pr-4 py-3 text-sm" 
-                           placeholder="Город, Улица (например: Москва Ленина)"
+                           className="custom-input w-full rounded-xl pl-10 pr-4 py-3 text-sm bg-[#151c28] border border-white/10 text-white focus:border-primary" 
+                           placeholder="Город, Улица (пр. Москва Ленина)"
                            value={pvzQuery}
                            onChange={(e) => setPvzQuery(e.target.value)}
                         />
                         {loadingPvz && <div className="absolute right-3 top-3.5"><span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span></div>}
                         
-                        {/* СПИСОК РЕЗУЛЬТАТОВ (Статичный, сдвигает контент вниз) */}
+                        {/* Результаты поиска (СТАТИЧНЫЙ БЛОК) */}
                         {pvzResults.length > 0 && (
-                            <div className="mt-2 bg-[#1c2636] border border-white/10 rounded-xl overflow-hidden animate-fade-in">
+                            <div className="mt-2 bg-[#1c2636] border border-white/10 rounded-xl overflow-hidden">
                                 {pvzResults.map(pvz => (
                                     <div 
                                         key={pvz.id} 
                                         onClick={() => setSelectedPvz(pvz)} 
-                                        className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer active:bg-white/10 transition-colors"
+                                        className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer active:bg-white/10"
                                     >
                                         <p className="text-white text-sm font-bold leading-tight">{pvz.city}, {pvz.address}</p>
                                         <p className="text-white/50 text-[10px] mt-1">{pvz.name}</p>
@@ -63,13 +63,12 @@ export default function AddressBlock({
                             </div>
                         )}
                         
-                        {/* Сообщение "Ничего не найдено" */}
                         {pvzResults.length === 0 && pvzQuery.length > 2 && !loadingPvz && (
-                            <div className="text-center text-white/30 text-xs mt-2">Ничего не найдено</div>
+                            <div className="text-center text-white/30 text-xs mt-2 p-2">Ничего не найдено</div>
                         )}
                     </div>
                 ) : (
-                    <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl flex justify-between items-center animate-fade-in">
+                    <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl flex justify-between items-center">
                         <div>
                             <p className="text-primary text-[10px] font-bold uppercase mb-1">Выбран пункт:</p>
                             <p className="text-white text-sm font-medium leading-snug">{selectedPvz.city}, {selectedPvz.address}</p>
@@ -83,7 +82,7 @@ export default function AddressBlock({
             </div>
         )}
 
-        {/* --- ЛОГИКА ПОЧТЫ РФ --- */}
+        {/* ПОЧТА РФ */}
         {deliveryMethod === 'Почта РФ' && (
             <div className="animate-fade-in space-y-3">
                 {addresses.length > 0 ? (
