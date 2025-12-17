@@ -4,55 +4,55 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Состояние калькулятора
+  // Адреса
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddress, setSelectedAddress] = useState(null);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+
+  // Калькулятор
   const [pointsInput, setPointsInput] = useState('');
   const [currentDiscount, setCurrentDiscount] = useState(0);
   const [promoCodeInput, setPromoCodeInput] = useState('');
 
-  // Баланс берем из базы (или 0, если данных нет)
+  // Баланс
   const userPointsBalance = dbUser?.points || 0;
 
-  // Состояние модалок
+  // Модалки
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isCouponsOpen, setIsCouponsOpen] = useState(false);
   
-  // Состояние редактирования товара
+  // Редактирование товара
   const [editingItem, setEditingItem] = useState(null); 
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
 
-  // Состояние формы заказа
+  // Форма заказа
   const [checkoutForm, setCheckoutForm] = useState({
-    name: dbUser?.name || user?.first_name || '',
-    phone: dbUser?.phone || '',
-    email: dbUser?.email || '',
-    address: dbUser?.address || '', 
+    name: '',
+    phone: '',
+    email: '',
+    address: '', 
     deliveryMethod: 'ПВЗ (5Post)',
     isDeliveryToggle: false,
     agreed: false,
     customsAgreed: false
   });
 
+  // --- 1. ЗАГРУЗКА ДАННЫХ ---
   useEffect(() => {
-    if (dbUser) {
-        setCheckoutForm(prev => ({
-            ...prev,
-            name: prev.name || dbUser.name,
-            phone: prev.phone || dbUser.phone,
-            email: prev.email || dbUser.email
-        }));
-    }
-  }, [dbUser]);
+    loadCart();
+    loadAddresses();
+  }, [user]);
 
-  // --- 1. ЗАГРУЗКА КОРЗИНЫ ---
+  // Загружаем товары
   const loadCart = async () => {
     setLoading(true);
     try {
-      const tgId = user?.id;
+      const tgId = user?.id || 1332986231;
       const res = await fetch(`https://proshein.com/webhook/get-cart?tg_id=${tgId}`);
       const text = await res.text();
-      
       if (!text) { setItems([]); return; }
+      
       const json = JSON.parse(text);
       let loadedItems = json.items || (Array.isArray(json) ? json : []);
       loadedItems = loadedItems.map(i => ({ ...i, quantity: i.quantity || 1 }));
@@ -64,7 +64,62 @@ export default function Cart({ user, dbUser, setActiveTab }) {
     }
   };
 
-  useEffect(() => { loadCart(); }, [user]);
+  // Загружаем адреса для автозаполнения
+  const loadAddresses = async () => {
+      if (!user?.id) return;
+      setLoadingAddresses(true);
+      try {
+          const res = await fetch(`https://proshein.com/webhook/get-addresses?tg_id=${user.id}`);
+          const json = await res.json();
+          const list = json.addresses || [];
+          setAddresses(list);
+
+          // Если есть адреса, выбираем основной сразу
+          if (list.length > 0) {
+              const def = list.find(a => a.is_default) || list[0];
+              selectAddress(def);
+          } else {
+              // Если адресов нет, подставляем данные из профиля/телеграма
+              setCheckoutForm(prev => ({
+                  ...prev,
+                  name: dbUser?.name || user?.first_name || '',
+                  phone: dbUser?.phone || '',
+                  email: dbUser?.email || ''
+              }));
+          }
+      } catch (e) {
+          console.error("Address load error", e);
+      } finally {
+          setLoadingAddresses(false);
+      }
+  };
+
+  // Функция выбора адреса (заполняет форму)
+  const selectAddress = (addr) => {
+      setSelectedAddress(addr);
+      setCheckoutForm(prev => ({
+          ...prev,
+          name: addr.full_name,
+          phone: addr.phone,
+          email: addr.email || prev.email,
+          address: `${addr.region ? addr.region + ', ' : ''}${addr.street}`
+      }));
+  };
+
+  // Сброс выбора (чтобы ввести вручную)
+  const clearSelectedAddress = () => {
+      setSelectedAddress(null);
+      setCheckoutForm({
+          name: '',
+          phone: '',
+          email: '',
+          address: '',
+          deliveryMethod: 'ПВЗ (5Post)',
+          isDeliveryToggle: false,
+          agreed: false,
+          customsAgreed: false
+      });
+  };
 
   // --- 2. МАТЕМАТИКА ---
   const subtotal = useMemo(() => {
@@ -130,7 +185,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
 
   const handlePayOrder = async () => {
       if (!checkoutForm.name || !checkoutForm.phone || !checkoutForm.address || !checkoutForm.email) {
-          window.Telegram?.WebApp?.showAlert('Заполните все поля');
+          window.Telegram?.WebApp?.showAlert('Заполните все поля или выберите адрес');
           return;
       }
       if (!checkoutForm.agreed) {
@@ -148,7 +203,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                  tg_id: user?.id,
+                  tg_id: user?.id || 1332986231,
                   user_info: {
                       name: checkoutForm.name,
                       phone: checkoutForm.phone,
@@ -194,8 +249,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   };
 
   return (
-    // ГЛАВНОЕ ИЗМЕНЕНИЕ: min-h-screen вместо h-screen. 
-    // pb-36 дает огромный отступ внизу, чтобы кнопка "Оплатить" не перекрывалась навигацией
     <div className="flex flex-col min-h-screen bg-transparent animate-fade-in pb-36">
       
       {/* Header */}
@@ -207,7 +260,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
         </div>
       </div>
 
-      {/* Items List - ТЕПЕРЬ ОН ПРОСТО РАСТЯГИВАЕТСЯ ВНИЗ */}
+      {/* Items List */}
       <div className="px-6 space-y-4">
         {loading ? (
             <div className="animate-pulse flex gap-4 p-4 border border-white/5 rounded-2xl">
@@ -231,7 +284,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                         onClick={() => openEditModal(item)}
                         className={`relative group p-3 rounded-2xl bg-dark-card/80 border backdrop-blur-sm overflow-hidden transition-all duration-300 hover:bg-dark-card cursor-pointer active:scale-[0.99] ${isWarning ? 'border-red-500/30 bg-red-900/5' : 'border-white/5'}`}
                     >
-                        {/* Кнопка удаления */}
                         <button 
                             className="absolute top-3 right-3 text-white/20 hover:text-red-400 transition-colors p-1 z-20" 
                             onClick={(e) => handleDeleteItem(e, item.id)}
@@ -279,7 +331,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
         )}
       </div>
 
-      {/* Footer Controls - ТЕПЕРЬ ОНИ ИДУТ СЛЕДОМ ЗА СПИСКОМ */}
+      {/* Footer Controls */}
       <div className="px-6 mt-6">
           <div className="flex gap-3 mb-4">
               <button onClick={() => setIsCouponsOpen(true)} className={`flex-1 bg-dark-card border rounded-xl h-12 flex items-center justify-center gap-2 text-sm transition-colors ${currentDiscount > 0 ? 'border-primary text-primary' : 'border-white/10 text-white hover:bg-white/5'}`}>
@@ -296,17 +348,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                   placeholder={`Списать WIBE (доступно: ${userPointsBalance})`} 
               />
               <button onClick={handleUseMaxPoints} className="absolute right-4 top-1/2 -translate-y-1/2 text-primary text-xs font-bold uppercase cursor-pointer hover:opacity-80">МАКС</button>
-          </div>
-
-          <div onClick={() => window.Telegram?.WebApp?.openLink('https://youtube.com/shorts/placeholder')} className="mb-4 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-blue-500/20 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                   <span className="material-symbols-outlined text-[18px]">play_circle</span>
-              </div>
-              <div className="flex-1">
-                   <p className="text-white text-xs font-bold">Таможня и паспорт</p>
-                   <p className="text-white/40 text-[10px]">Зачем это нужно? (1 мин)</p>
-              </div>
-              <span className="material-symbols-outlined text-white/30 text-[16px]">chevron_right</span>
           </div>
 
           <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-3 mb-4">
@@ -351,6 +392,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       </div>
 
       {/* --- MODALS --- */}
+      
       {/* ОФОРМЛЕНИЕ ЗАКАЗА */}
       {isCheckoutOpen && (
           <div className="fixed inset-0 z-50 bg-[#101622] flex flex-col animate-fade-in">
@@ -361,34 +403,77 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                  <h2 className="text-lg font-bold">Оформление</h2>
                  <div className="w-10"></div>
              </div>
+             
              <div className="flex-1 overflow-y-auto p-6 space-y-6">
                  <div className="flex flex-col gap-4 bg-surface-dark/50 p-5 rounded-2xl border border-white/5">
-                     <div className="space-y-1.5">
-                         <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 ml-1">ФИО</label>
-                         <input name="name" autoComplete="name" className="custom-input w-full rounded-xl px-4 py-3 text-sm" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} placeholder="Иванов Иван" />
-                     </div>
-                     <div className="space-y-1.5">
-                         <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 ml-1">Телефон</label>
-                         <input name="phone" autoComplete="tel" className="custom-input w-full rounded-xl px-4 py-3 text-sm" type="tel" value={checkoutForm.phone} onChange={e => setCheckoutForm({...checkoutForm, phone: e.target.value})} placeholder="+7 999 ..." />
-                     </div>
-                     <div className="space-y-1.5">
-                         <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 ml-1">Email</label>
-                         <input name="email" autoComplete="email" className="custom-input w-full rounded-xl px-4 py-3 text-sm" type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} placeholder="mail@example.com" />
-                     </div>
-                     <div className="h-px bg-white/5 my-2"></div>
-                     <div className="space-y-3">
-                         <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 ml-1">Доставка</label>
-                         <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer">
+                     
+                     {/* ЛОГИКА ОТОБРАЖЕНИЯ АДРЕСА */}
+                     {selectedAddress ? (
+                         // ЕСЛИ АДРЕС ВЫБРАН (Сохраненный)
+                         <div className="space-y-3 animate-fade-in">
+                             <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Адрес доставки</h3>
+                                {addresses.length > 1 && (
+                                    <button onClick={() => clearSelectedAddress()} className="text-primary text-xs font-bold">Изменить</button>
+                                )}
+                             </div>
+                             
+                             <div className="p-4 bg-white/5 border border-primary/30 rounded-xl relative overflow-hidden">
+                                 <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+                                 <div className="flex items-start gap-3">
+                                     <div className="mt-1 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                         <span className="material-symbols-outlined text-lg">location_on</span>
+                                     </div>
+                                     <div>
+                                         <p className="text-white font-bold text-sm">{selectedAddress.full_name}</p>
+                                         <p className="text-white/60 text-xs mt-0.5">{selectedAddress.phone}</p>
+                                         <p className="text-white text-sm mt-2 leading-relaxed">
+                                             {selectedAddress.region ? `${selectedAddress.region}, ` : ''}{selectedAddress.street}
+                                         </p>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             <button onClick={clearSelectedAddress} className="w-full py-2 text-white/30 text-xs hover:text-white transition-colors">
+                                 Ввести другой адрес вручную
+                             </button>
+                         </div>
+                     ) : (
+                         // ЕСЛИ АДРЕСА НЕТ - ПОКАЗЫВАЕМ ПОЛЯ ВВОДА
+                         <>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 ml-1">Данные получателя</span>
+                                {addresses.length > 0 && (
+                                    <button onClick={() => selectAddress(addresses[0])} className="text-primary text-xs">Выбрать сохраненный</button>
+                                )}
+                            </div>
+                             <div className="space-y-1.5">
+                                 <input name="name" autoComplete="name" className="custom-input w-full rounded-xl px-4 py-3 text-sm" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} placeholder="ФИО (Иванов Иван)" />
+                             </div>
+                             <div className="space-y-1.5">
+                                 <input name="phone" autoComplete="tel" className="custom-input w-full rounded-xl px-4 py-3 text-sm" type="tel" value={checkoutForm.phone} onChange={e => setCheckoutForm({...checkoutForm, phone: e.target.value})} placeholder="Телефон (+7...)" />
+                             </div>
+                             <div className="space-y-1.5">
+                                 <input name="email" autoComplete="email" className="custom-input w-full rounded-xl px-4 py-3 text-sm" type="email" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} placeholder="Email" />
+                             </div>
+                             <div className="h-px bg-white/5 my-2"></div>
+                             <div className="space-y-3">
+                                 <label className="text-[11px] font-bold uppercase tracking-wider text-primary ml-1">Адрес доставки</label>
+                                 <input className="custom-input w-full rounded-xl px-4 py-3 text-sm" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} placeholder="Город, Улица, Дом, Кв" />
+                             </div>
+                         </>
+                     )}
+                     
+                     {/* Выбор метода доставки (всегда виден) */}
+                     <div className="pt-2">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 ml-1 mb-2 block">Способ доставки</label>
+                        <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer">
                              <div className="relative flex items-center">
                                  <input type="checkbox" className="peer sr-only" checked={checkoutForm.isDeliveryToggle} onChange={e => setCheckoutForm({...checkoutForm, isDeliveryToggle: e.target.checked, deliveryMethod: e.target.checked ? 'Почта РФ' : 'ПВЗ (5Post)'})} />
                                  <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:bg-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
                              </div>
                              <span className="text-sm font-medium text-white">{checkoutForm.isDeliveryToggle ? 'Почта РФ' : 'ПВЗ (5Post)'}</span>
                          </label>
-                         <div>
-                             <label className="text-[11px] font-bold uppercase tracking-wider text-primary ml-1">Адрес</label>
-                             <input className="custom-input w-full rounded-xl px-4 py-3 text-sm" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} placeholder="Город, Улица, Дом" />
-                         </div>
                      </div>
                      
                      {/* Галочки согласия */}
@@ -413,7 +498,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
           </div>
       )}
 
-      {/* ВЫБОР РАЗМЕРА И ЦВЕТА */}
+      {/* ОСТАЛЬНЫЕ МОДАЛКИ (Размер, Купоны) - Без изменений */}
       {editingItem && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
               <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setEditingItem(null)}></div>
@@ -426,7 +511,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                       </button>
                   </div>
                   <div className="flex-1 p-6 flex flex-col overflow-y-auto">
-                      {/* Размеры */}
                       <div className="mb-6">
                           <h4 className="text-[10px] uppercase tracking-[0.25em] text-white/40 font-semibold mb-2.5">Размер</h4>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -443,7 +527,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
           </div>
       )}
 
-      {/* КУПОНЫ */}
       {isCouponsOpen && (
         <div className="fixed inset-0 z-50 bg-[#101622] flex flex-col animate-fade-in">
            <div className="flex items-center justify-between p-6 pt-8 border-b border-white/5 bg-[#101622]/95 backdrop-blur-md">
