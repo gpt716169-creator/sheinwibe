@@ -78,10 +78,32 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   const searchPvz = async (q) => {
       setLoadingPvz(true);
       try {
+          console.log("Searching PVZ:", q); // Лог запроса
           const res = await fetch(`https://proshein.com/webhook/search-pvz?q=${encodeURIComponent(q)}`);
-          const json = await res.json();
-          setPvzResults(Array.isArray(json) ? json : []);
-      } catch (e) { console.error(e); } finally { setLoadingPvz(false); }
+          
+          const rawData = await res.json();
+          console.log("PVZ Response:", rawData); // Лог ответа сервера
+
+          // Универсальный парсинг: ищем массив хоть где-то
+          let list = [];
+          if (Array.isArray(rawData)) {
+              list = rawData;
+          } else if (rawData && Array.isArray(rawData.data)) {
+              list = rawData.data;
+          } else if (rawData && Array.isArray(rawData.rows)) {
+              list = rawData.rows;
+          } else if (rawData && Array.isArray(rawData.items)) {
+              list = rawData.items;
+          }
+
+          // Фильтруем пустые, если вдруг попадутся
+          setPvzResults(list);
+      } catch (e) { 
+          console.error("Search PVZ Error:", e); 
+          window.Telegram?.WebApp?.showAlert("Ошибка поиска ПВЗ");
+      } finally { 
+          setLoadingPvz(false); 
+      }
   };
 
   // --- LOGIC ---
