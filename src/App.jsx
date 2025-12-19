@@ -57,11 +57,15 @@ function App() {
         const json = await res.json();
         
         if (json.status === 'success') {
-            console.log("User data loaded:", json.data);
-            setDbUser(json.data); // <-- Вот тут обновляется стейт, и Home перерисовывается
+            // !!! ВАЖНОЕ ИСПРАВЛЕНИЕ !!!
+            // Если база вернула массив [user], берем user
+            const finalUser = Array.isArray(json.data) ? json.data[0] : json.data;
+            
+            console.log("User Set to State:", finalUser);
+            setDbUser(finalUser);
         }
     } catch (e) {
-        console.error("Ошибка инициализации:", e);
+        console.error("Init Error:", e);
     }
   };
 
