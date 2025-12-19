@@ -2,12 +2,19 @@ import React, { useState, useEffect } from 'react';
 import LinkSearch from '../components/home/LinkSearch';
 import ActiveOrders from '../components/home/ActiveOrders';
 import LoyaltyCard from '../components/home/LoyaltyCard';
-import LoyaltyModal from '../components/home/LoyaltyModal'; // Импортируем новую модалку
+import LoyaltyModal from '../components/home/LoyaltyModal';
+import FullScreenVideo from '../components/ui/FullScreenVideo'; // <--- Импортируем плеер
 
 export default function Home({ user, dbUser, setActiveTab }) {
   const [activeOrders, setActiveOrders] = useState([]);
-  const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false); // Состояние модалки
+  const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false);
   
+  // Состояние для видео-инструкции
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
+  // ССЫЛКА НА ВИДЕО ИЗ ЯНДЕКСА (Вставь свою)
+  const TUTORIAL_VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/vkclips_20251219084052.mp4";
+
   useEffect(() => {
     if (user?.id) {
         loadData();
@@ -70,7 +77,7 @@ export default function Home({ user, dbUser, setActiveTab }) {
                 <LoyaltyCard 
                     points={dbUser?.points || 0} 
                     totalSpent={dbUser?.total_spent || 0}
-                    onOpenDetails={() => setIsLoyaltyModalOpen(true)} // Открываем модалку
+                    onOpenDetails={() => setIsLoyaltyModalOpen(true)}
                 />
             </div>
 
@@ -80,24 +87,40 @@ export default function Home({ user, dbUser, setActiveTab }) {
                 onGoToOrders={() => setActiveTab('profile')} 
             />
 
-            {/* FAQ BUTTON */}
-            <div onClick={() => window.Telegram?.WebApp?.openLink('https://t.me/sheinwibe_help')} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                    <span className="material-symbols-outlined">help</span>
+            {/* 4. БЛОК "КАК ЭТО РАБОТАЕТ" (Теперь открывает видео) */}
+            <div 
+                onClick={() => setIsTutorialOpen(true)} 
+                className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors active:scale-[0.98]"
+            >
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary relative">
+                    <span className="material-symbols-outlined">play_arrow</span>
+                    {/* Пульсирующий круг для привлечения внимания */}
+                    <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-75"></div>
                 </div>
                 <div className="flex-1">
                     <h4 className="text-white font-bold text-sm">Как это работает?</h4>
-                    <p className="text-white/40 text-xs">Инструкция по заказу и доставке</p>
+                    <p className="text-white/40 text-xs">Видео-инструкция (45 сек)</p>
                 </div>
                 <span className="material-symbols-outlined text-white/20">chevron_right</span>
             </div>
+
         </div>
 
-        {/* --- ГЛОБАЛЬНАЯ МОДАЛКА ЛОЯЛЬНОСТИ (ПОВЕРХ ВСЕГО) --- */}
+        {/* --- ГЛОБАЛЬНЫЕ МОДАЛКИ (ПОВЕРХ ВСЕГО) --- */}
+        
+        {/* Модалка уровней */}
         {isLoyaltyModalOpen && (
             <LoyaltyModal 
                 totalSpent={dbUser?.total_spent || 0} 
                 onClose={() => setIsLoyaltyModalOpen(false)} 
+            />
+        )}
+
+        {/* Видео плеер */}
+        {isTutorialOpen && (
+            <FullScreenVideo 
+                src={TUTORIAL_VIDEO_URL} 
+                onClose={() => setIsTutorialOpen(false)} 
             />
         )}
     </div>
