@@ -75,8 +75,9 @@ export default function Home({ user, dbUser, setActiveTab }) {
             <div className="relative z-10">
                 <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-3 ml-1 opacity-50">Мой уровень</h3>
                 <LoyaltyCard 
-                    points={dbUser?.points || 0} 
-                    totalSpent={dbUser?.total_spent || 0}
+                    // Гарантированно превращаем в числа
+                    points={parseInt(dbUser?.points) || 0} 
+                    totalSpent={parseInt(dbUser?.total_spent) || 0}
                     onOpenDetails={() => setIsLoyaltyModalOpen(true)}
                 />
             </div>
