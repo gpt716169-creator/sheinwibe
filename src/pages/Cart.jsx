@@ -40,7 +40,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   const userPointsBalance = dbUser?.points || 0;
   
   // ССЫЛКА НА ВИДЕО (Замени на свою из Supabase)
-  const VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/22334.mp4"; 
+  const VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/vkclips_20251219083418.mp4"; 
 
   // ... (useEffect и все функции loadCart, loadAddresses, searchPvz остаются без изменений) ...
 
