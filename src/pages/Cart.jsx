@@ -2,53 +2,48 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CartItem from '../components/cart/CartItem';
 import PaymentBlock from '../components/cart/PaymentBlock';
 import FullScreenVideo from '../components/ui/FullScreenVideo';
-import EditItemModal from '../components/cart/EditItemModal'; // <--- Новый
-import CheckoutModal from '../components/cart/CheckoutModal'; // <--- Новый
+import EditItemModal from '../components/cart/EditItemModal';
+import CheckoutModal from '../components/cart/CheckoutModal';
 
 export default function Cart({ user, dbUser, setActiveTab }) {
-  // --- STATE ---
+  // --- STATE: DATA ---
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Адреса (храним тут, чтобы не терять при закрытии модалки)
+  // --- STATE: ADDRESS & DELIVERY ---
+  // Храним адреса здесь, чтобы они не исчезали при закрытии модалки
   const [addresses, setAddresses] = useState([]);
   const [deliveryMethod, setDeliveryMethod] = useState('ПВЗ (5Post)');
-  const [selectedAddress, setSelectedAddress] = useState(null);
   
-  // 5Post (храним тут)
-  const [pvzQuery, setPvzQuery] = useState('');
-  const [pvzResults, setPvzResults] = useState([]);
+  // Выбранные пункты
+  const [selectedAddress, setSelectedAddress] = useState(null);
   const [selectedPvz, setSelectedPvz] = useState(null);
-  const [loadingPvz, setLoadingPvz] = useState(false);
 
-  // Скидки
+  // --- STATE: DISCOUNTS ---
   const [pointsInput, setPointsInput] = useState('');
   const [couponInput, setCouponInput] = useState('');
   const [activeCoupon, setActiveCoupon] = useState(null); 
   const [couponDiscount, setCouponDiscount] = useState(0);
 
-  // UI
+  // --- STATE: UI ---
   const [showCheckout, setShowCheckout] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [savingItem, setSavingItem] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
 
+  // CONSTANTS
   const VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/vkclips_20251219083418.mp4"; 
   const MAX_POINTS_PERCENT = 0.35;
   const userPointsBalance = dbUser?.points || 0;
 
-  // --- LOADING ---
+  // --- LOAD DATA ---
   useEffect(() => {
-    if (user?.id) { loadCart(); loadAddresses(); }
+    if (user?.id) { 
+        loadCart(); 
+        loadAddresses(); 
+    }
   }, [user]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (pvzQuery.length > 2 && !selectedPvz) searchPvz(pvzQuery);
-    }, 600);
-    return () => clearTimeout(t);
-  }, [pvzQuery]);
 
   const loadCart = async () => {
     setLoading(true);
@@ -67,17 +62,37 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       } catch (e) { console.error(e); }
   };
 
-  const searchPvz = async (q) => {
-      setLoadingPvz(true);
-      try {
-          const res = await fetch(`https://proshein.com/webhook/search-pvz?q=${encodeURIComponent(q)}`);
-          const rawData = await res.json();
-          let list = Array.isArray(rawData) ? rawData : (rawData?.rows || []);
-          setPvzResults(list);
-      } catch (e) { console.error(e); } finally { setLoadingPvz(false); }
+  // --- ACTIONS ---
+
+  // Переход к управлению адресами
+  const handleManageAddresses = () => {
+      // Сохраняем флаг, чтобы Профиль знал, что надо открыть вкладку адресов
+      sessionStorage.setItem('open_profile_tab', 'addresses');
+      setActiveTab('profile');
   };
 
-  // --- LOGIC ---
+  const handleUpdateQuantity = (id, delta) => setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i));
+  
+  const handleDeleteItem = async (e, id) => {
+      if(!window.confirm('Удалить?')) return;
+      setItems(prev => prev.filter(i => i.id !== id));
+      await fetch('https://proshein.com/webhook/delete-item', { method: 'POST', body: JSON.stringify({ id, tg_id: user?.id }) });
+  };
+
+  const saveItemParams = async (id, size, color) => {
+      setSavingItem(true);
+      setItems(prev => prev.map(i => i.id === id ? { ...i, size, color } : i));
+      try {
+          await fetch('https://proshein.com/webhook/update-cart-item', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, size, color, tg_id: user?.id })
+          });
+      } catch (e) { console.error(e); } 
+      finally { setSavingItem(false); setEditingItem(null); }
+  };
+
+  // --- CALCULATIONS ---
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.final_price_rub * i.quantity), 0), [items]);
   const maxAllowedPoints = Math.floor(subtotal * MAX_POINTS_PERCENT);
   const availablePointsLimit = Math.min(maxAllowedPoints, userPointsBalance);
@@ -106,28 +121,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
 
   const pointsUsed = parseInt(pointsInput) || 0;
   const finalTotal = Math.max(0, subtotal - couponDiscount - pointsUsed);
-
-  // --- ITEM ACTIONS ---
-  const handleUpdateQuantity = (id, delta) => setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i));
-  
-  const handleDeleteItem = async (e, id) => {
-      if(!window.confirm('Удалить?')) return;
-      setItems(prev => prev.filter(i => i.id !== id));
-      await fetch('https://proshein.com/webhook/delete-item', { method: 'POST', body: JSON.stringify({ id, tg_id: user?.id }) });
-  };
-
-  const saveItemParams = async (id, size, color) => {
-      setSavingItem(true);
-      setItems(prev => prev.map(i => i.id === id ? { ...i, size, color } : i));
-      try {
-          await fetch('https://proshein.com/webhook/update-cart-item', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id, size, color, tg_id: user?.id })
-          });
-      } catch (e) { console.error(e); } 
-      finally { setSavingItem(false); setEditingItem(null); }
-  };
 
   const openCheckout = () => {
       if (items.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
@@ -162,17 +155,13 @@ export default function Cart({ user, dbUser, setActiveTab }) {
 
       {/* --- MODALS --- */}
 
-      {/* 1. Редактирование товара */}
       {editingItem && (
         <EditItemModal 
-          item={editingItem} 
-          onClose={() => setEditingItem(null)} 
-          onSave={saveItemParams} 
-          saving={savingItem} 
+          item={editingItem} onClose={() => setEditingItem(null)} 
+          onSave={saveItemParams} saving={savingItem} 
         />
       )}
 
-      {/* 2. Купон (Простая центрированная модалка) */}
       {showCouponModal && (
          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm" onClick={() => setShowCouponModal(false)}>
             <div className="bg-[#1c2636] w-full max-w-sm rounded-2xl p-6 border border-white/10" onClick={e => e.stopPropagation()}>
@@ -183,22 +172,20 @@ export default function Cart({ user, dbUser, setActiveTab }) {
          </div>
       )}
 
-      {/* 3. Оформление заказа (Fullscreen) */}
       {showCheckout && (
         <CheckoutModal 
            onClose={(success) => { setShowCheckout(false); if(success) { setItems([]); setActiveTab('home'); } }}
-           user={user} dbUser={dbUser} // <-- ПЕРЕДАЕМ dbUser
+           user={user} dbUser={dbUser}
            total={finalTotal} items={items} pointsUsed={pointsUsed} couponDiscount={couponDiscount} activeCoupon={activeCoupon}
-           // Прокидываем состояния адресов, чтобы они не сбрасывались
+           // Адреса
            addresses={addresses} deliveryMethod={deliveryMethod} setDeliveryMethod={setDeliveryMethod}
            selectedAddress={selectedAddress} setSelectedAddress={setSelectedAddress}
-           pvzQuery={pvzQuery} setPvzQuery={setPvzQuery} pvzResults={pvzResults}
-           selectedPvz={selectedPvz} setSelectedPvz={setSelectedPvz} loadingPvz={loadingPvz}
-           onOpenProfile={() => setActiveTab('profile')}
+           selectedPvz={selectedPvz} setSelectedPvz={setSelectedPvz}
+           // Переход в профиль -> адреса
+           onManageAddresses={handleManageAddresses} 
         />
       )}
 
-      {/* 4. Видео */}
       {videoOpen && <FullScreenVideo src={VIDEO_URL} onClose={() => setVideoOpen(false)} />}
     </div>
   );
