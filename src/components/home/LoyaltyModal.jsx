@@ -4,7 +4,7 @@ export default function LoyaltyModal({ totalSpent, onClose }) {
   // Данные об уровнях
   const LEVELS_INFO = [
       { name: 'Bronze', range: '0 - 15 000 ₽', cashback: '1%', coupons: 'Обычные купоны', color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-      { name: 'Silver', range: '15 000 - 50 000 ₽', cashback: '2%', coupons: 'Серебрянные купоны до 10% + Бесплатная доставка', color: 'text-gray-300', bg: 'bg-gray-400/10 border-gray-400/20' },
+      { name: 'Silver', range: '15 000 - 50 000 ₽', cashback: '2%', coupons: 'Серебрянные купоны до 10%', color: 'text-gray-300', bg: 'bg-gray-400/10 border-gray-400/20' },
       { name: 'Gold', range: '50 000 - 150 000 ₽', cashback: '3%', coupons: 'Золотые купоны до 15%', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
       { name: 'Platinum', range: '> 150 000 ₽', cashback: '5%', coupons: 'Платиновые купоны до 20%', color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' },
   ];
