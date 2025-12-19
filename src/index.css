@@ -45,16 +45,25 @@ body {
 
 .keyboard-open .bottom-nav-container { display: none !important; }
 
-/* --- 3D Flip Utilities (НОВОЕ) --- */
+/* 3D Transform Utilities */
+
+/* 1. Создает глубину сцены */
 .perspective-1000 {
   perspective: 1000px;
 }
-.transform-style-3d {
+
+/* 2. Важно! Заставляет дочерние элементы вращаться в 3D, а не плоско */
+.preserve-3d {
   transform-style: preserve-3d;
 }
+
+/* 3. Скрывает "изнанку" элемента, когда он повернут спиной */
 .backface-hidden {
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden; /* Обязательно для iPhone/Safari */
 }
+
+/* 4. Класс для поворота на 180 градусов */
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
