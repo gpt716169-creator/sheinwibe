@@ -4,16 +4,14 @@ import AddressBlock from './AddressBlock';
 
 export default function CheckoutModal({ 
   onClose, user, dbUser, total, items, pointsUsed, couponDiscount, activeCoupon,
-  // Пропсы для AddressBlock
+  // Пропсы
   addresses, deliveryMethod, setDeliveryMethod,
   selectedAddress, setSelectedAddress,
-  pvzQuery, setPvzQuery, pvzResults,
-  selectedPvz, setSelectedPvz, loadingPvz,
+  selectedPvz, setSelectedPvz,
   onOpenProfile
 }) {
 
-  // Инициализируем форму пустыми значениями
-  // (Данные подставятся сами, когда юзер кликнет на сохраненный адрес в AddressBlock)
+  // Данные заполнятся сами при выборе адреса
   const [form, setForm] = useState({ name: '', phone: '', email: '', agreed: false, customsAgreed: false });
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +20,7 @@ export default function CheckoutModal({
     return () => document.body.style.overflow = 'auto';
   }, []);
 
-  // Функция, которая принимает данные из AddressBlock при клике на сохраненный адрес
+  // Функция автозаполнения (вызывается из AddressBlock)
   const handleAddressSelect = (addr) => {
       if (addr) {
           setForm(prev => ({
@@ -35,7 +33,7 @@ export default function CheckoutModal({
   };
 
   const handlePay = async () => {
-     // 1. Валидация контактов
+     // Валидация контактов
      if (!form.name || form.name.length < 2) { 
          window.Telegram?.WebApp?.showAlert('Введите ФИО получателя'); return; 
      }
@@ -46,33 +44,23 @@ export default function CheckoutModal({
          window.Telegram?.WebApp?.showAlert('Примите условия оферты и таможни'); return;
      }
 
-     // 2. Сбор адреса
      let finalAddress = '';
      let pickupInfo = null;
 
+     // СТРОГАЯ ВАЛИДАЦИЯ ВЫБОРА АДРЕСА
      if (deliveryMethod === 'ПВЗ (5Post)') {
-         // ЛОГИКА ИЗМЕНЕНА:
-         // Если выбран сохраненный пункт (selectedPvz) - берем его.
-         // Если нет, берем то, что юзер написал руками в поле (pvzQuery).
-         if (selectedPvz) {
-             finalAddress = `5Post: ${selectedPvz.city}, ${selectedPvz.address} (${selectedPvz.name})`;
-             pickupInfo = { id: selectedPvz.id, postal_code: selectedPvz.postal_code };
-         } else if (pvzQuery && pvzQuery.length > 5) {
-             // Ручной ввод
-             finalAddress = `5Post (Ручной ввод): ${pvzQuery}`;
-             pickupInfo = null; // ID нет, так как введено руками
-         } else {
-             window.Telegram?.WebApp?.showAlert('Укажите адрес магазина Пятерочка');
+         if (!selectedPvz) {
+             window.Telegram?.WebApp?.showAlert('Выберите сохраненный магазин 5Post из списка');
              return;
          }
+         finalAddress = `5Post: ${selectedPvz.city}, ${selectedPvz.address}`;
+         pickupInfo = { id: selectedPvz.id, postal_code: '000000' };
      } else {
-         // Почта России
-         if (selectedAddress) {
-             finalAddress = [selectedAddress.region, selectedAddress.city, selectedAddress.street, selectedAddress.house, selectedAddress.flat].filter(Boolean).join(', ');
-         } else {
-             window.Telegram?.WebApp?.showAlert('Выберите сохраненный адрес или добавьте новый в профиле');
+         if (!selectedAddress) {
+             window.Telegram?.WebApp?.showAlert('Выберите адрес доставки из списка');
              return;
          }
+         finalAddress = [selectedAddress.region, selectedAddress.city, selectedAddress.street, selectedAddress.house, selectedAddress.flat].filter(Boolean).join(', ');
      }
 
      setLoading(true);
@@ -131,7 +119,7 @@ export default function CheckoutModal({
       {/* Контент */}
       <div className="flex-1 overflow-y-auto p-5 pb-32 space-y-6">
          
-         {/* КОНТАКТЫ (Кнопка "Взять из профиля" удалена) */}
+         {/* КОНТАКТЫ */}
          <section className="space-y-3">
              <h3 className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Контакты получателя</h3>
              <div className="space-y-3">
@@ -147,15 +135,15 @@ export default function CheckoutModal({
              
              <AddressBlock 
                  deliveryMethod={deliveryMethod} setDeliveryMethod={setDeliveryMethod}
-                 addresses={addresses} selectedAddress={selectedAddress} setSelectedAddress={setSelectedAddress}
-                 pvzQuery={pvzQuery} setPvzQuery={setPvzQuery} pvzResults={pvzResults}
-                 selectedPvz={selectedPvz} setSelectedPvz={setSelectedPvz} loadingPvz={loadingPvz}
+                 addresses={addresses} 
+                 selectedAddress={selectedAddress} setSelectedAddress={setSelectedAddress}
+                 selectedPvz={selectedPvz} setSelectedPvz={setSelectedPvz}
                  onOpenProfile={onOpenProfile}
                  onFillFromAddress={handleAddressSelect} 
              />
          </section>
 
-         {/* Соглашения */}
+         {/* СОГЛАШЕНИЯ */}
          <section className="space-y-3 pt-2">
              <label className="flex gap-3 items-center cursor-pointer group select-none">
                  <input type="checkbox" checked={form.agreed} onChange={e => setForm({...form, agreed: e.target.checked})} className="w-5 h-5 rounded border-white/30 bg-white/5 checked:bg-primary checked:border-primary appearance-none transition-colors" />
