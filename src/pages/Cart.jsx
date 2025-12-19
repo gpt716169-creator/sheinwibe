@@ -4,18 +4,17 @@ import PaymentBlock from '../components/cart/PaymentBlock';
 import FullScreenVideo from '../components/ui/FullScreenVideo';
 import EditItemModal from '../components/cart/EditItemModal';
 import CheckoutModal from '../components/cart/CheckoutModal';
-// Добавь onRefreshData в аргументы
+
+// Добавляем onRefreshData в аргументы
 export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   // --- STATE: DATA ---
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // --- STATE: ADDRESS & DELIVERY ---
-  // Храним адреса здесь, чтобы они не исчезали при закрытии модалки
   const [addresses, setAddresses] = useState([]);
   const [deliveryMethod, setDeliveryMethod] = useState('ПВЗ (5Post)');
   
-  // Выбранные пункты
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [selectedPvz, setSelectedPvz] = useState(null);
 
@@ -64,9 +63,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
   // --- ACTIONS ---
 
-  // Переход к управлению адресами
   const handleManageAddresses = () => {
-      // Сохраняем флаг, чтобы Профиль знал, что надо открыть вкладку адресов
       sessionStorage.setItem('open_profile_tab', 'addresses');
       setActiveTab('profile');
   };
@@ -174,14 +171,20 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
       {showCheckout && (
         <CheckoutModal 
-           onClose={(success) => { setShowCheckout(false); if(success) { setItems([]); setActiveTab('home'); } }}
+           // ИЗМЕНЕНИЕ ЗДЕСЬ: Вызываем onRefreshData при успехе
+           onClose={(success) => { 
+               setShowCheckout(false); 
+               if(success) { 
+                   setItems([]); 
+                   if (onRefreshData) onRefreshData(); // <-- ОБНОВЛЯЕМ ДАННЫЕ ЮЗЕРА
+                   setActiveTab('home'); 
+               } 
+           }}
            user={user} dbUser={dbUser}
            total={finalTotal} items={items} pointsUsed={pointsUsed} couponDiscount={couponDiscount} activeCoupon={activeCoupon}
-           // Адреса
            addresses={addresses} deliveryMethod={deliveryMethod} setDeliveryMethod={setDeliveryMethod}
            selectedAddress={selectedAddress} setSelectedAddress={setSelectedAddress}
            selectedPvz={selectedPvz} setSelectedPvz={setSelectedPvz}
-           // Переход в профиль -> адреса
            onManageAddresses={handleManageAddresses} 
         />
       )}
