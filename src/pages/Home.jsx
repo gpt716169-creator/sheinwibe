@@ -64,12 +64,11 @@ export default function Home({ user, dbUser, setActiveTab }) {
             {/* 1. ПОИСК (Самое важное) */}
             <LinkSearch onSearch={handleSearch} />
 
-            {/* 2. КАРТА ЛОЯЛЬНОСТИ (WIBE) */}
-            <div>
-                <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-3 ml-1 opacity-50">Мой уровень</h3>
+           {/* 2. КАРТА ЛОЯЛЬНОСТИ */}
+            <div className="animate-fade-in delay-100">
                 <LoyaltyCard 
                     points={dbUser?.points || 0} 
-                    status={dbUser?.status_level || 'Bronze'} 
+                    totalSpent={dbUser?.total_spent || 0}  // Передаем сумму покупок
                 />
             </div>
 
