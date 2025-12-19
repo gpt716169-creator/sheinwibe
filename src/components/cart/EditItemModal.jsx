@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // <--- ВАЖНЫЙ ИМПОРТ
 
 export default function EditItemModal({ item, onClose, onSave, saving }) {
   const [tempSize, setTempSize] = useState(item?.size === 'NOT_SELECTED' ? null : item?.size);
   const [tempColor, setTempColor] = useState(item?.color);
 
+  // Блокируем скролл основной страницы, пока открыто окно
   useEffect(() => {
-    document.body.style.overflow = 'hidden'; 
+    document.body.style.overflow = 'hidden';
     return () => document.body.style.overflow = 'auto';
   }, []);
 
@@ -26,14 +28,19 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
       : (item.size_options || []);
   } catch (e) {}
 
-  return (
-    // ИЗМЕНЕНИЯ ЗДЕСЬ:
-    // 1. z-[9999] - чтобы точно поверх всего
-    // 2. items-start - прижимаем к верху (было center)
-    // 3. pt-20 - отступ сверху (чтобы не прилипало к самому краю экрана телефона)
-    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-20 px-4 bg-black/90 backdrop-blur-md animate-fade-in" onClick={onClose}>
-      
-      <div className="bg-[#151c28] w-full max-w-sm rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
+  // --- ВОТ ГЛАВНОЕ ИЗМЕНЕНИЕ ---
+  // Мы используем createPortal, чтобы рендерить это окно ПРЯМО В BODY,
+  // минуя все родительские блоки, скроллы и трансформации.
+  return createPortal(
+    <div 
+        className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 px-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }} // Дублируем стили для надежности
+    >
+      <div 
+          className="bg-[#151c28] w-full max-w-sm rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative mt-safe-top" 
+          onClick={e => e.stopPropagation()}
+      >
         
         {/* Хедер */}
         <div className="flex gap-4 p-5 border-b border-white/5 bg-[#1a2332]">
@@ -91,6 +98,7 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body // <-- ВОТ КЛЮЧ: Рендерим прямо в body
   );
 }
