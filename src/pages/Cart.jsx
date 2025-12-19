@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CartItem from '../components/cart/CartItem';
 import AddressBlock from '../components/cart/AddressBlock';
 import PaymentBlock from '../components/cart/PaymentBlock';
+import FullScreenVideo from '../components/ui/FullScreenVideo'; // <--- Импорт
 
 export default function Cart({ user, dbUser, setActiveTab }) {
+  // ... (весь твой код стейтов items, loading и т.д.) ...
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -31,8 +33,16 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   const [tempSize, setTempSize] = useState(null);
   const [tempColor, setTempColor] = useState(null);
   const [savingItem, setSavingItem] = useState(false);
+  
+  // !!! НОВЫЙ СТЕЙТ ДЛЯ ВИДЕО !!!
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
 
   const userPointsBalance = dbUser?.points || 0;
+  
+  // ССЫЛКА НА ВИДЕО (Замени на свою из Supabase)
+  const VIDEO_URL = "https://nneccwuagyietimdqmoa.supabase.co/storage/v1/object/public/videos/customs_tutorial.mp4"; 
+
+  // ... (useEffect и все функции loadCart, loadAddresses, searchPvz остаются без изменений) ...
 
   useEffect(() => {
     if (user?.id) {
@@ -47,7 +57,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
     }
   }, [user]);
 
-  // Debounce PVZ
   useEffect(() => {
     const t = setTimeout(() => {
       if (pvzQuery.length > 2 && !selectedPvz) searchPvz(pvzQuery);
@@ -55,7 +64,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
     return () => clearTimeout(t);
   }, [pvzQuery]);
 
-  // --- API ---
   const loadCart = async () => {
     setLoading(true);
     try {
@@ -76,26 +84,18 @@ export default function Cart({ user, dbUser, setActiveTab }) {
   const searchPvz = async (q) => {
       setLoadingPvz(true);
       try {
-          // Ищем
           const res = await fetch(`https://proshein.com/webhook/search-pvz?q=${encodeURIComponent(q)}`);
           const rawData = await res.json();
-          
-          // Парсим любой формат ответа
           let list = [];
           if (Array.isArray(rawData)) list = rawData;
           else if (rawData?.json && Array.isArray(rawData.json)) list = rawData.json;
           else if (rawData?.data && Array.isArray(rawData.data)) list = rawData.data;
           else if (rawData?.rows && Array.isArray(rawData.rows)) list = rawData.rows;
-
           setPvzResults(list);
-      } catch (e) { 
-          console.error(e); 
-      } finally { 
-          setLoadingPvz(false); 
-      }
+      } catch (e) { console.error(e); } finally { setLoadingPvz(false); }
   };
 
-  // --- LOGIC ---
+  // ... (функции subtotal, updateQuantity, deleteItem, openEditModal, saveItemParams, handlePay - БЕЗ ИЗМЕНЕНИЙ) ...
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.final_price_rub * i.quantity), 0), [items]);
   const finalTotal = Math.max(0, subtotal - currentDiscount - (parseInt(pointsInput) || 0));
 
@@ -109,7 +109,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       await fetch('https://proshein.com/webhook/delete-item', { method: 'POST', body: JSON.stringify({ id, tg_id: user?.id }) });
   };
 
-  // --- EDIT ITEM ---
   const openEditModal = (item) => {
       setEditingItem(item);
       setTempSize(item.size === 'NOT_SELECTED' ? null : item.size);
@@ -130,7 +129,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       finally { setSavingItem(false); setEditingItem(null); }
   };
 
-  // --- PAY ---
   const handlePay = async () => {
       if (items.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
           window.Telegram?.WebApp?.showAlert('Выберите размер для всех товаров!');
@@ -186,6 +184,7 @@ export default function Cart({ user, dbUser, setActiveTab }) {
       }
   };
 
+  // --- RENDER ---
   return (
     <div className="flex flex-col min-h-screen bg-transparent animate-fade-in pb-32 overflow-y-auto">
       
@@ -210,7 +209,9 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                       />
                   ))}
               </div>
+              
               <div className="h-px bg-white/5 my-4"></div>
+
               <PaymentBlock 
                   subtotal={subtotal} 
                   total={finalTotal} 
@@ -220,30 +221,27 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                   userPointsBalance={userPointsBalance}
                   handleUseMaxPoints={() => setPointsInput(Math.min(userPointsBalance, subtotal * 0.5))}
                   onOpenCoupons={() => {}} 
-                  onPay={() => setIsCheckoutOpen(true)} 
+                  onPay={() => setIsCheckoutOpen(true)}
+                  onPlayVideo={() => setIsVideoOpen(true)} // <--- Открываем видео
               />
           </div>
       )}
 
-      {/* --- CHECKOUT MODAL --- */}
+      {/* ОСТАЛЬНЫЕ МОДАЛКИ (CHECKOUT, EDIT) ... (оставляем как было) */}
       {isCheckoutOpen && (
           <div className="fixed inset-0 z-50 bg-[#101622] flex flex-col animate-slide-up">
-              {/* Шапка модалки */}
-              <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[#101622] sticky top-0 z-10">
+              <div className="flex items-center justify-between p-6 border-b border-white/5 sticky top-0 bg-[#101622] z-10">
                   <button onClick={() => setIsCheckoutOpen(false)} className="text-white/50">Назад</button>
                   <h2 className="text-white font-bold">Оформление</h2>
                   <div className="w-10"></div>
               </div>
-              
-              {/* Скроллящийся контент */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-20">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   <div className="space-y-3">
                       <h3 className="text-[10px] uppercase font-bold text-white/50">Получатель</h3>
                       <input className="custom-input w-full rounded-xl px-4 py-3 text-sm" placeholder="ФИО" value={contactForm.name} onChange={e => setContactForm({...contactForm, name: e.target.value})} />
                       <input className="custom-input w-full rounded-xl px-4 py-3 text-sm" placeholder="Телефон" type="tel" value={contactForm.phone} onChange={e => setContactForm({...contactForm, phone: e.target.value})} />
                       <input className="custom-input w-full rounded-xl px-4 py-3 text-sm" placeholder="Email" type="email" value={contactForm.email} onChange={e => setContactForm({...contactForm, email: e.target.value})} />
                   </div>
-
                   <div className="space-y-3">
                       <h3 className="text-[10px] uppercase font-bold text-white/50">Доставка</h3>
                       <AddressBlock 
@@ -261,7 +259,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                           onOpenProfile={() => setActiveTab('profile')}
                       />
                   </div>
-
                   <div className="space-y-2 pt-2">
                       <label className="flex gap-3 items-center">
                           <input type="checkbox" checked={contactForm.agreed} onChange={e => setContactForm({...contactForm, agreed: e.target.checked})} className="rounded bg-white/10 border-white/20 text-primary" />
@@ -272,8 +269,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                           <span className="text-xs text-white/60">Паспорт для таможни</span>
                       </label>
                   </div>
-
-                  {/* КНОПКА ПОДТВЕРДИТЬ - ТЕПЕРЬ ОНА В ПОТОКЕ */}
                   <div className="pt-4">
                       <button onClick={handlePay} className="w-full h-14 bg-primary text-[#102216] font-bold rounded-xl text-lg shadow-lg">
                           Подтвердить {finalTotal.toLocaleString()} ₽
@@ -283,7 +278,6 @@ export default function Cart({ user, dbUser, setActiveTab }) {
           </div>
       )}
 
-      {/* --- EDIT MODAL (CENTERED) --- */}
       {editingItem && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setEditingItem(null)}>
                <div className="bg-[#151c28] w-full max-w-sm rounded-2xl border border-white/10 overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -326,6 +320,14 @@ export default function Cart({ user, dbUser, setActiveTab }) {
                    </div>
                </div>
           </div>
+      )}
+
+      {/* --- ВИДЕО ПЛЕЕР --- */}
+      {isVideoOpen && (
+          <FullScreenVideo 
+              src={VIDEO_URL} 
+              onClose={() => setIsVideoOpen(false)} 
+          />
       )}
     </div>
   );
