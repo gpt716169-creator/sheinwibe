@@ -5,7 +5,7 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
   const [tempColor, setTempColor] = useState(item?.color);
 
   useEffect(() => {
-    document.body.style.overflow = 'hidden'; // Блокируем скролл фона
+    document.body.style.overflow = 'hidden'; 
     return () => document.body.style.overflow = 'auto';
   }, []);
 
@@ -19,7 +19,6 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
     onSave(item.id, tempSize, tempColor);
   };
 
-  // Парсим опции размеров
   let sizeOptions = [];
   try {
     sizeOptions = typeof item.size_options === 'string' 
@@ -28,8 +27,13 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
   } catch (e) {}
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="bg-[#151c28] w-full max-w-sm rounded-2xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
+    // ИЗМЕНЕНИЯ ЗДЕСЬ:
+    // 1. z-[9999] - чтобы точно поверх всего
+    // 2. items-start - прижимаем к верху (было center)
+    // 3. pt-20 - отступ сверху (чтобы не прилипало к самому краю экрана телефона)
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-20 px-4 bg-black/90 backdrop-blur-md animate-fade-in" onClick={onClose}>
+      
+      <div className="bg-[#151c28] w-full max-w-sm rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
         
         {/* Хедер */}
         <div className="flex gap-4 p-5 border-b border-white/5 bg-[#1a2332]">
