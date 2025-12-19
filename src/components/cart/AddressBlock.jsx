@@ -4,15 +4,14 @@ export default function AddressBlock({
     deliveryMethod, setDeliveryMethod, addresses, 
     selectedAddress, setSelectedAddress, 
     selectedPvz, setSelectedPvz,
-    onOpenProfile,
+    onManageAddresses, // <-- Кнопка теперь ведет в Адреса
     onFillFromAddress
 }) {
 
-  // Разделяем адреса на 5Post и Обычные
+  // Фильтры
   const courierAddresses = addresses.filter(addr => !((addr.street+addr.city+(addr.region||'')).toLowerCase().includes('5post')));
   const saved5PostAddresses = addresses.filter(addr => (addr.street+addr.city+(addr.region||'')).toLowerCase().includes('5post'));
 
-  // Логика выбора 5Post из списка
   const handleSelectSavedPvz = (addr) => {
       setSelectedPvz({
           id: 'saved_' + addr.id,
@@ -24,7 +23,6 @@ export default function AddressBlock({
       if (onFillFromAddress) onFillFromAddress(addr);
   };
 
-  // Логика выбора Курьера
   const handleSelectCourier = (addr) => {
       setSelectedAddress(addr);
       if (onFillFromAddress) onFillFromAddress(addr);
@@ -32,7 +30,7 @@ export default function AddressBlock({
 
   return (
     <div className="space-y-4">
-        {/* Переключатель Типа Доставки */}
+        {/* Переключатель */}
         <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/5">
            <button 
                onClick={() => { setDeliveryMethod('ПВЗ (5Post)'); setSelectedPvz(null); }}
@@ -48,7 +46,7 @@ export default function AddressBlock({
            </button>
         </div>
 
-        {/* --- 5POST (ТОЛЬКО СПИСОК) --- */}
+        {/* --- 5POST --- */}
         {deliveryMethod === 'ПВЗ (5Post)' && (
             <div className="animate-fade-in space-y-3">
                 {saved5PostAddresses.length > 0 ? (
@@ -68,21 +66,20 @@ export default function AddressBlock({
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-8 border border-dashed border-white/10 rounded-xl bg-white/5">
-                        <span className="material-symbols-outlined text-white/20 text-4xl mb-2">no_meeting_room</span>
-                        <p className="text-white/50 text-xs mb-4">Нет сохраненных магазинов Пятерочка</p>
+                    <div className="text-center py-6 border border-dashed border-white/10 rounded-xl bg-white/5">
+                        <span className="material-symbols-outlined text-white/20 text-3xl mb-2">no_meeting_room</span>
+                        <p className="text-white/50 text-xs mb-3">Нет сохраненных магазинов</p>
                     </div>
                 )}
                 
-                {/* КНОПКА ДОБАВИТЬ */}
-                <button onClick={onOpenProfile} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-white/60 hover:text-white hover:border-white/40 text-xs font-bold transition-all flex items-center justify-center gap-2">
+                <button onClick={onManageAddresses} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-white/60 hover:text-white hover:border-white/40 text-xs font-bold transition-all flex items-center justify-center gap-2">
                     <span className="material-symbols-outlined text-sm">add</span>
-                    Добавить новый 5Post в Профиле
+                    Добавить новый 5Post
                 </button>
             </div>
         )}
 
-        {/* --- ПОЧТА РОССИИ (ТОЛЬКО СПИСОК) --- */}
+        {/* --- ПОЧТА РОССИИ --- */}
         {deliveryMethod === 'Почта РФ' && (
             <div className="animate-fade-in space-y-3">
                 {courierAddresses.length > 0 ? (
@@ -95,25 +92,22 @@ export default function AddressBlock({
                             >
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm text-white font-medium truncate">{addr.region ? `${addr.region}, ` : ''}{addr.city}, {addr.street}, {addr.house}</p>
-                                    <p className="text-[10px] text-white/50 truncate">
-                                        {addr.full_name} • {addr.phone}
-                                    </p>
+                                    <p className="text-[10px] text-white/50 truncate">{addr.full_name} • {addr.phone}</p>
                                 </div>
                                 {selectedAddress?.id === addr.id && <span className="material-symbols-outlined text-primary shrink-0">check_circle</span>}
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-8 border border-dashed border-white/10 rounded-xl bg-white/5">
-                        <span className="material-symbols-outlined text-white/20 text-4xl mb-2">home_pin</span>
-                        <p className="text-white/50 text-xs mb-4">Нет сохраненных адресов</p>
+                    <div className="text-center py-6 border border-dashed border-white/10 rounded-xl bg-white/5">
+                        <span className="material-symbols-outlined text-white/20 text-3xl mb-2">home_pin</span>
+                        <p className="text-white/50 text-xs mb-3">Нет сохраненных адресов</p>
                     </div>
                 )}
 
-                {/* КНОПКА ДОБАВИТЬ */}
-                <button onClick={onOpenProfile} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-white/60 hover:text-white hover:border-white/40 text-xs font-bold transition-all flex items-center justify-center gap-2">
+                <button onClick={onManageAddresses} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-white/60 hover:text-white hover:border-white/40 text-xs font-bold transition-all flex items-center justify-center gap-2">
                     <span className="material-symbols-outlined text-sm">add</span>
-                    Добавить адрес в Профиле
+                    Добавить адрес
                 </button>
             </div>
         )}
