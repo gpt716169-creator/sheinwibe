@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import LinkSearch from '../components/home/LinkSearch';
 import ActiveOrders from '../components/home/ActiveOrders';
 import LoyaltyCard from '../components/home/LoyaltyCard';
+import LoyaltyModal from '../components/home/LoyaltyModal'; // Импортируем новую модалку
 
 export default function Home({ user, dbUser, setActiveTab }) {
   const [activeOrders, setActiveOrders] = useState([]);
+  const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false); // Состояние модалки
   
   useEffect(() => {
     if (user?.id) {
@@ -13,7 +15,6 @@ export default function Home({ user, dbUser, setActiveTab }) {
   }, [user]);
 
   const loadData = async () => {
-      // Загружаем заказы для виджета
       try {
           const res = await fetch(`https://proshein.com/webhook/get-orders?tg_id=${user?.id}`);
           const json = await res.json();
@@ -53,32 +54,33 @@ export default function Home({ user, dbUser, setActiveTab }) {
                 <h1 className="text-white text-2xl font-bold">Привет, {user?.first_name || 'Друг'}! 👋</h1>
                 <p className="text-white/40 text-xs mt-1">Найдем твой стиль сегодня?</p>
             </div>
-            {/* Аватарка (можно сделать переход в профиль) */}
             <div onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-full bg-white/10 border border-white/10 bg-cover bg-center cursor-pointer" style={{backgroundImage: user?.photo_url ? `url('${user.photo_url}')` : 'none'}}>
                  {!user?.photo_url && <span className="material-symbols-outlined text-white/50 w-full h-full flex items-center justify-center">person</span>}
             </div>
         </div>
 
-        <div className="px-6 space-y-8">
+        <div className="px-6 space-y-8 relative z-0">
             
-            {/* 1. ПОИСК (Самое важное) */}
+            {/* 1. ПОИСК */}
             <LinkSearch onSearch={handleSearch} />
 
-           {/* 2. КАРТА ЛОЯЛЬНОСТИ */}
-            <div className="animate-fade-in delay-100">
+            {/* 2. КАРТА ЛОЯЛЬНОСТИ */}
+            <div className="relative z-10">
+                <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-3 ml-1 opacity-50">Мой уровень</h3>
                 <LoyaltyCard 
                     points={dbUser?.points || 0} 
-                    totalSpent={dbUser?.total_spent || 0}  // Передаем сумму покупок
+                    totalSpent={dbUser?.total_spent || 0}
+                    onOpenDetails={() => setIsLoyaltyModalOpen(true)} // Открываем модалку
                 />
             </div>
 
-            {/* 3. АКТИВНЫЕ ЗАКАЗЫ (Показываем только если есть) */}
+            {/* 3. АКТИВНЫЕ ЗАКАЗЫ */}
             <ActiveOrders 
                 orders={activeOrders} 
                 onGoToOrders={() => setActiveTab('profile')} 
             />
 
-            {/* Дополнительный блок (например, FAQ или Инструкция) */}
+            {/* FAQ BUTTON */}
             <div onClick={() => window.Telegram?.WebApp?.openLink('https://t.me/sheinwibe_help')} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors">
                 <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
                     <span className="material-symbols-outlined">help</span>
@@ -89,8 +91,15 @@ export default function Home({ user, dbUser, setActiveTab }) {
                 </div>
                 <span className="material-symbols-outlined text-white/20">chevron_right</span>
             </div>
-
         </div>
+
+        {/* --- ГЛОБАЛЬНАЯ МОДАЛКА ЛОЯЛЬНОСТИ (ПОВЕРХ ВСЕГО) --- */}
+        {isLoyaltyModalOpen && (
+            <LoyaltyModal 
+                totalSpent={dbUser?.total_spent || 0} 
+                onClose={() => setIsLoyaltyModalOpen(false)} 
+            />
+        )}
     </div>
   );
 }
