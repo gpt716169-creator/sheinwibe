@@ -8,13 +8,13 @@ import AddressModal from '../components/profile/AddressModal';
 
 export default function Profile({ user, dbUser }) {
   // --- STATE ---
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'addresses' | 'referral'
+  const [activeTab, setActiveTab] = useState('orders'); 
   
   const [orders, setOrders] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
   
-  // Modals State
+  // Modals
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
@@ -47,11 +47,6 @@ export default function Profile({ user, dbUser }) {
 
   // --- HANDLERS ---
   const handleSaveAddress = async (addressData) => {
-      if (!addressData.full_name || !addressData.phone || !addressData.street) {
-          window.Telegram?.WebApp?.showAlert("Заполните все поля");
-          return;
-      }
-
       window.Telegram?.WebApp?.MainButton.showProgress();
       try {
           const res = await fetch('https://proshein.com/webhook/save-address', {
@@ -59,7 +54,7 @@ export default function Profile({ user, dbUser }) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   tg_id: user.id,
-                  address: { ...addressData, email: dbUser?.email || '' }
+                  address: addressData // Email теперь внутри addressData
               })
           });
           const json = await res.json();
@@ -67,7 +62,9 @@ export default function Profile({ user, dbUser }) {
               window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
               setIsAddressModalOpen(false);
               setEditingAddress(null);
-              loadAddresses(); 
+              loadAddresses(); // Перезагружаем список
+          } else {
+              window.Telegram?.WebApp?.showAlert("Ошибка: " + json.message);
           }
       } catch (e) {
           window.Telegram?.WebApp?.showAlert("Ошибка сохранения");
@@ -76,17 +73,27 @@ export default function Profile({ user, dbUser }) {
       }
   };
 
-  const handleDeleteAddress = async (id, e) => {
+  // !!! ИСПРАВЛЕННОЕ УДАЛЕНИЕ !!!
+  const handleDeleteAddress = async (addressId, e) => {
       e.stopPropagation();
-      if(!window.confirm("Удалить адрес?")) return;
+      if(!window.confirm("Вы точно хотите удалить этот адрес?")) return;
+      
+      // Сначала обновляем UI (оптимистично), чтобы пользователь увидел результат мгновенно
+      // Фильтруем массив: оставляем только те, у кого ID НЕ совпадает с удаляемым
+      const newAddresses = addresses.filter(a => a.id !== addressId);
+      setAddresses(newAddresses);
+
       try {
           await fetch('https://proshein.com/webhook/delete-address', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id, tg_id: user.id })
+              body: JSON.stringify({ id: addressId, tg_id: user.id })
           });
-          setAddresses(prev => prev.filter(a => a.id !== id));
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+          console.error("Delete error:", e);
+          // Если ошибка - возвращаем адрес обратно (по желанию, но обычно не критично)
+          loadAddresses();
+      }
   };
 
   const openNewAddress = () => {
@@ -103,10 +110,10 @@ export default function Profile({ user, dbUser }) {
   return (
     <div className="flex flex-col h-screen pb-24 animate-fade-in overflow-y-auto">
         
-        {/* 1. HEADER */}
+        {/* HEADER */}
         <ProfileHeader user={user} dbUser={dbUser} />
 
-        {/* 2. TABS */}
+        {/* TABS */}
         <div className="px-6 mb-6 shrink-0">
             <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
                 <button onClick={() => setActiveTab('orders')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'orders' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'}`}>Заказы</button>
@@ -115,7 +122,7 @@ export default function Profile({ user, dbUser }) {
             </div>
         </div>
 
-        {/* 3. CONTENT */}
+        {/* CONTENT */}
         {activeTab === 'orders' && (
             <OrdersTab orders={orders} onSelectOrder={setSelectedOrder} />
         )}
@@ -134,7 +141,7 @@ export default function Profile({ user, dbUser }) {
             <ReferralTab userId={user?.id} />
         )}
 
-        {/* 4. MODALS */}
+        {/* MODALS */}
         <OrderDetailsModal 
             order={selectedOrder} 
             onClose={() => setSelectedOrder(null)} 
