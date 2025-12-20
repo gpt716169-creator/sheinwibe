@@ -109,24 +109,21 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   };
   
   const handleDeleteItem = async (e, id) => {
-      if(!window.confirm('Удалить товар?')) return;
-      setItems(prev => prev.filter(i => i.id !== id));
-      try {
-          await fetch('https://proshein.com/webhook/delete-item', { method: 'POST', body: JSON.stringify({ id, tg_id: user?.id }) });
-      } catch (e) { console.error(e); }
-  };
+      if(!window.confirm('Удалить товар из корзины?')) return;
 
-  const saveItemParams = async (id, size, color) => {
-      setSavingItem(true);
-      setItems(prev => prev.map(i => i.id === id ? { ...i, size, color } : i));
+      // 1. Оптимистичное удаление (сразу убираем с экрана)
+      setItems(prev => prev.filter(i => i.id !== id));
+
       try {
-          await fetch('https://proshein.com/webhook/update-cart-item', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id, size, color, tg_id: user?.id })
+          await fetch('https://proshein.com/webhook/delete-item', { 
+              method: 'POST', 
+              // !!! ВОТ ЭТОЙ СТРОЧКИ НЕ ХВАТАЛО !!!
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ id, tg_id: user?.id }) 
           });
-      } catch (e) { console.error(e); } 
-      finally { setSavingItem(false); setEditingItem(null); }
+      } catch (e) { 
+          console.error("Ошибка удаления:", e); 
+      }
   };
 
   // --- CALCULATIONS ---
