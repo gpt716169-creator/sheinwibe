@@ -126,6 +126,45 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       }
   };
 
+  const saveItemParams = async (id, newSize, newColor) => {
+    // 1. Ищем товар
+    const currentItem = items.find(i => i.id === id);
+    if (!currentItem) return;
+
+    setSavingItem(true);
+
+    // 2. Оптимистичное обновление
+    setItems(prev => prev.map(i => i.id === id ? { ...i, size: newSize, color: newColor } : i));
+
+    // 3. Отправка на сервер
+    try {
+        await fetch('https://proshein.com/webhook/update-cart-item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id,
+                quantity: currentItem.quantity,
+                size: newSize,
+                color: newColor,
+                tg_id: user?.id
+            })
+        });
+
+        // Успех — просто закрываем модалку
+        setEditingItem(null);
+        window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
+
+    } catch (e) {
+        console.error("Ошибка сохранения параметров:", e);
+        window.Telegram?.WebApp?.showAlert('Ошибка сохранения');
+
+        // Реверт изменений при ошибке
+        setItems(prev => prev.map(i => i.id === id ? { ...i, size: currentItem.size, color: currentItem.color } : i));
+    } finally {
+        setSavingItem(false);
+    }
+  };
+
   // --- CALCULATIONS ---
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + (i.final_price_rub * i.quantity), 0), [items]);
   const maxAllowedPoints = Math.floor(subtotal * MAX_POINTS_PERCENT);
