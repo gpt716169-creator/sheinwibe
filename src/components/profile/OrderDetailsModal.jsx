@@ -51,7 +51,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       { time: 24 * 60, status: 'Сборка заказа', location: 'Склад SHEIN' },
       { time: 2 * 24 * 60, status: 'Заказ отправлен', location: 'Логистика SHEIN' },
       { time: 3 * 24 * 60, status: 'В пути на склад SHEINWIBE', location: 'Транзит' },
-      { time: 7 * 24 * 60, status: 'Прибыл на склад SHEINWIBE', location: 'Склад РФ' },
+      { time: 7 * 24 * 60, status: 'Прибыл на склад SHEINWIBE', location: 'Склад SW' },
       { time: 8 * 24 * 60, status: 'Таможенное оформление', location: 'Таможня' }
     ];
 
