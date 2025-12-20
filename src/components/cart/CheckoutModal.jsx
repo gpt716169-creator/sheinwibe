@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import AddressBlock from './AddressBlock';
 
+// Ссылка на оферту
+const OFFER_LINK = 'https://storage.yandexcloud.net/videosheinwibe/%D0%94%D0%BE%D0%B3%D0%BE%D0%B2%D0%BE%D1%80%20%D0%BE%D1%84%D0%B5%D1%80%D1%82%D1%8B%20SHEINWIBE.pdf';
+
 export default function CheckoutModal({ 
   onClose, user, dbUser, total, items, pointsUsed, couponDiscount, activeCoupon,
   // Пропсы
@@ -34,39 +37,39 @@ export default function CheckoutModal({
   };
 
   const handlePay = async () => {
-     // Проверяем, выбрал ли юзер адрес (если выбрал - данные контактов там уже есть)
-     if (deliveryMethod === 'ПВЗ (5Post)' && !selectedPvz) {
-         window.Telegram?.WebApp?.showAlert('Выберите магазин 5Post из списка'); return;
-     }
-     if (deliveryMethod !== 'ПВЗ (5Post)' && !selectedAddress) {
-         window.Telegram?.WebApp?.showAlert('Выберите адрес доставки из списка'); return;
-     }
+      // Проверяем, выбрал ли юзер адрес (если выбрал - данные контактов там уже есть)
+      if (deliveryMethod === 'ПВЗ (5Post)' && !selectedPvz) {
+          window.Telegram?.WebApp?.showAlert('Выберите магазин 5Post из списка'); return;
+      }
+      if (deliveryMethod !== 'ПВЗ (5Post)' && !selectedAddress) {
+          window.Telegram?.WebApp?.showAlert('Выберите адрес доставки из списка'); return;
+      }
 
-     // Валидация контактов (на случай если в сохраненном адресе их почему-то нет)
-     if (!form.name || form.name.length < 2) { 
-         window.Telegram?.WebApp?.showAlert('В выбранном адресе не указано ФИО получателя. Исправьте это в профиле.'); return; 
-     }
-     if (!form.phone) { 
-         window.Telegram?.WebApp?.showAlert('В выбранном адресе не указан телефон. Исправьте это в профиле.'); return; 
-     }
+      // Валидация контактов (на случай если в сохраненном адресе их почему-то нет)
+      if (!form.name || form.name.length < 2) { 
+          window.Telegram?.WebApp?.showAlert('В выбранном адресе не указано ФИО получателя. Исправьте это в профиле.'); return; 
+      }
+      if (!form.phone) { 
+          window.Telegram?.WebApp?.showAlert('В выбранном адресе не указан телефон. Исправьте это в профиле.'); return; 
+      }
 
-     if (!form.agreed || !form.customsAgreed) {
-         window.Telegram?.WebApp?.showAlert('Примите условия оферты и таможни'); return;
-     }
+      if (!form.agreed || !form.customsAgreed) {
+          window.Telegram?.WebApp?.showAlert('Примите условия оферты и таможни'); return;
+      }
 
-     let finalAddress = '';
-     let pickupInfo = null;
+      let finalAddress = '';
+      let pickupInfo = null;
 
-     if (deliveryMethod === 'ПВЗ (5Post)') {
-         finalAddress = `5Post: ${selectedPvz.city}, ${selectedPvz.address}`;
-         pickupInfo = { id: selectedPvz.id, postal_code: '000000' };
-     } else {
-         finalAddress = [selectedAddress.region, selectedAddress.city, selectedAddress.street, selectedAddress.house, selectedAddress.flat].filter(Boolean).join(', ');
-     }
+      if (deliveryMethod === 'ПВЗ (5Post)') {
+          finalAddress = `5Post: ${selectedPvz.city}, ${selectedPvz.address}`;
+          pickupInfo = { id: selectedPvz.id, postal_code: '000000' };
+      } else {
+          finalAddress = [selectedAddress.region, selectedAddress.city, selectedAddress.street, selectedAddress.house, selectedAddress.flat].filter(Boolean).join(', ');
+      }
 
-     setLoading(true);
-     try {
-         const payload = {
+      setLoading(true);
+      try {
+          const payload = {
             tg_id: user?.id || 1332986231,
             user_info: {
                 name: form.name,
@@ -84,26 +87,37 @@ export default function CheckoutModal({
             coupon_code: activeCoupon,
             coupon_discount: couponDiscount,
             discount_applied: pointsUsed + couponDiscount
-         };
+          };
 
-         const res = await fetch('https://proshein.com/webhook/create-order', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify(payload)
-         });
+          const res = await fetch('https://proshein.com/webhook/create-order', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify(payload)
+          });
 
-         const json = await res.json();
-         if (json.status === 'success') {
-             window.Telegram?.WebApp?.showAlert(`Заказ #${json.order_id} успешно создан!`);
-             onClose(true);
-         } else {
-             throw new Error(json.message || 'Ошибка сервера');
-         }
-     } catch (e) {
-         window.Telegram?.WebApp?.showAlert('Ошибка: ' + e.message);
-     } finally {
-         setLoading(false);
-     }
+          const json = await res.json();
+          if (json.status === 'success') {
+              window.Telegram?.WebApp?.showAlert(`Заказ #${json.order_id} успешно создан!`);
+              onClose(true);
+          } else {
+              throw new Error(json.message || 'Ошибка сервера');
+          }
+      } catch (e) {
+          window.Telegram?.WebApp?.showAlert('Ошибка: ' + e.message);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  // Функция для открытия оферты
+  const openOffer = (e) => {
+    e.stopPropagation(); // Чтобы клик не ставил галочку в чекбоксе
+    e.preventDefault();
+    if (window.Telegram?.WebApp?.openLink) {
+        window.Telegram.WebApp.openLink(OFFER_LINK);
+    } else {
+        window.open(OFFER_LINK, '_blank');
+    }
   };
 
   return createPortal(
@@ -136,12 +150,30 @@ export default function CheckoutModal({
          {/* Соглашения */}
          <section className="space-y-3 pt-2">
              <label className="flex gap-3 items-center cursor-pointer group select-none">
-                 <input type="checkbox" checked={form.agreed} onChange={e => setForm({...form, agreed: e.target.checked})} className="w-5 h-5 rounded border-white/30 bg-white/5 checked:bg-primary checked:border-primary appearance-none transition-colors" />
-                 <span className="text-xs text-white/60">Я согласен с условиями публичной оферты</span>
+                 <input 
+                    type="checkbox" 
+                    checked={form.agreed} 
+                    onChange={e => setForm({...form, agreed: e.target.checked})} 
+                    className="w-5 h-5 rounded border-white/30 bg-white/5 checked:bg-primary checked:border-primary appearance-none transition-colors shrink-0" 
+                 />
+                 <span className="text-xs text-white/60 leading-tight">
+                    Я согласен с условиями{' '}
+                    <span 
+                        onClick={openOffer} 
+                        className="text-primary underline decoration-primary/50 underline-offset-2 hover:text-primary/80 transition-colors"
+                    >
+                        публичной оферты
+                    </span>
+                 </span>
              </label>
              <label className="flex gap-3 items-center cursor-pointer group select-none">
-                 <input type="checkbox" checked={form.customsAgreed} onChange={e => setForm({...form, customsAgreed: e.target.checked})} className="w-5 h-5 rounded border-white/30 bg-white/5 checked:bg-primary checked:border-primary appearance-none transition-colors" />
-                 <span className="text-xs text-white/60">Предоставлю данные для таможни</span>
+                 <input 
+                    type="checkbox" 
+                    checked={form.customsAgreed} 
+                    onChange={e => setForm({...form, customsAgreed: e.target.checked})} 
+                    className="w-5 h-5 rounded border-white/30 bg-white/5 checked:bg-primary checked:border-primary appearance-none transition-colors shrink-0" 
+                 />
+                 <span className="text-xs text-white/60 leading-tight">Предоставлю данные для таможни</span>
              </label>
          </section>
       </div>
