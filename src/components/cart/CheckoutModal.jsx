@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import AddressBlock from './AddressBlock';
 
 // Ссылка на оферту
-const OFFER_LINK = 'https://storage.yandexcloud.net/videosheinwibe/%D0%94%D0%BE%D0%B3%D0%BE%D0%B2%D0%BE%D1%80%20%D0%BE%D1%84%D0%B5%D1%80%D1%82%D1%8B%20SHEINWIBE.pdf';
+const OFFER_LINK = window.location.origin + '/offer.pdf';
 
 export default function CheckoutModal({ 
   onClose, user, dbUser, total, items, pointsUsed, couponDiscount, activeCoupon,
@@ -111,10 +111,14 @@ export default function CheckoutModal({
 
   // Функция для открытия оферты
   const openOffer = (e) => {
-    e.stopPropagation(); // Чтобы клик не ставил галочку в чекбоксе
+    e.stopPropagation();
     e.preventDefault();
+    
+    // Для Telegram Mini Apps лучше открывать во внешнем браузере, 
+    // так как встроенный вебвью телеграма иногда глючит с PDF
     if (window.Telegram?.WebApp?.openLink) {
-        window.Telegram.WebApp.openLink(OFFER_LINK);
+        // try_instant_view: false заставляет открыть системный браузер
+        window.Telegram.WebApp.openLink(OFFER_LINK, { try_instant_view: false });
     } else {
         window.open(OFFER_LINK, '_blank');
     }
