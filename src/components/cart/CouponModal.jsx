@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // <--- 1. Импортируем Portal
 
 export default function CouponModal({ userId, subtotal, onClose, onApply, activeCouponCode }) {
     const [coupons, setCoupons] = useState([]);
     const [loading, setLoading] = useState(true);
     const [manualCode, setManualCode] = useState('');
     const [checking, setChecking] = useState(false);
+
+    // --- 2. Блокируем скролл основной страницы ---
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => document.body.style.overflow = 'auto';
+    }, []);
 
     useEffect(() => {
         loadCoupons();
@@ -14,6 +21,7 @@ export default function CouponModal({ userId, subtotal, onClose, onApply, active
         setLoading(true);
         try {
             const tgId = userId || 1332986231;
+            // Убедись, что путь совпадает с твоим рабочим вебхуком
             const res = await fetch(`https://proshein.com/webhook/get-user-coupons?tg_id=${tgId}`);
             const json = await res.json();
             
@@ -44,17 +52,18 @@ export default function CouponModal({ userId, subtotal, onClose, onApply, active
         setChecking(false);
     };
 
-    return (
-        <div className="fixed inset-0 z-[60] flex flex-col animate-fade-in">
+    // --- 3. Оборачиваем всё в createPortal(..., document.body) ---
+    return createPortal(
+        <div className="fixed inset-0 z-[99999] flex flex-col animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
             {/* Фон (Backdrop) */}
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
             
             {/* Контент модалки */}
-            {/* Используем h-full, чтобы растянуть на весь экран (как отдельную страницу) */}
-            <div className="relative z-10 flex flex-col w-full h-full bg-[#101622] md:h-auto md:max-h-[85vh] md:rounded-t-3xl md:mt-auto">
+            {/* Добавил mt-auto, чтобы на больших экранах выезжало снизу, а на телефоне было на весь экран */}
+            <div className="relative z-10 flex flex-col w-full h-full bg-[#101622] md:h-auto md:max-h-[85vh] md:rounded-t-3xl md:mt-auto shadow-2xl">
                 
                 {/* --- ФИКСИРОВАННАЯ ВЕРХНЯЯ ЧАСТЬ --- */}
-                <div className="bg-[#101622] z-20 shadow-xl border-b border-white/5">
+                <div className="bg-[#101622] z-20 border-b border-white/5 shrink-0 rounded-t-3xl">
                     
                     {/* 1. Заголовок и Закрыть */}
                     <div className="flex items-center justify-between px-6 pt-6 pb-2">
@@ -62,12 +71,12 @@ export default function CouponModal({ userId, subtotal, onClose, onApply, active
                             <span className="material-symbols-outlined">close</span>
                         </button>
                         <h2 className="text-lg font-bold text-white tracking-wide">Купоны</h2>
-                        <div className="w-10"></div> {/* Пустой блок для центровки заголовка */}
+                        <div className="w-10"></div> {/* Пустой блок для центровки */}
                     </div>
 
-                    {/* 2. Поле ввода (теперь тоже зафиксировано сверху) */}
+                    {/* 2. Поле ввода */}
                     <div className="px-6 pb-6 pt-2">
-                        <div className="bg-surface-dark p-3 rounded-2xl border border-white/10">
+                        <div className="bg-[#1a2333] p-3 rounded-2xl border border-white/10">
                             <p className="text-white/50 text-[10px] mb-2 font-bold uppercase tracking-wider ml-1">Ввести промокод</p>
                             <div className="flex gap-2">
                                 <input 
@@ -93,7 +102,7 @@ export default function CouponModal({ userId, subtotal, onClose, onApply, active
                 </div>
 
                 {/* --- ПРОКРУЧИВАЕМАЯ ОБЛАСТЬ (СПИСОК) --- */}
-                <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-6 pb-safe-bottom">
                     <div>
                         <h3 className="text-white font-bold mb-4 flex items-center gap-2 px-1 text-sm uppercase tracking-wider text-white/50">
                             Доступные купоны
@@ -110,7 +119,7 @@ export default function CouponModal({ userId, subtotal, onClose, onApply, active
                                  <p className="text-sm">Нет доступных купонов</p>
                              </div>
                         ) : (
-                            <div className="space-y-3 pb-20"> {/* pb-20 чтобы последний элемент не перекрывался низом экрана */}
+                            <div className="space-y-3 pb-10"> 
                                 {coupons.map(c => {
                                     const isActive = activeCouponCode === c.code;
                                     const isApplicable = subtotal >= (c.min_order_amount || 0);
@@ -174,6 +183,7 @@ export default function CouponModal({ userId, subtotal, onClose, onApply, active
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body // <--- 4. Рендерим прямо в body
     );
 }
