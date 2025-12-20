@@ -19,6 +19,8 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
   // --- STATE: DISCOUNTS ---
   const [pointsInput, setPointsInput] = useState('');
+  
+  // ВАЖНО: Теперь activeCoupon это объект, а не строка
   const [activeCoupon, setActiveCoupon] = useState(null); 
   const [couponDiscount, setCouponDiscount] = useState(0);
 
@@ -81,7 +83,6 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       const newQty = Math.max(1, currentItem.quantity + delta);
       if (newQty === currentItem.quantity) return;
 
-      // Оптимистичное обновление UI
       setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
 
       try {
@@ -101,16 +102,12 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       }
   };
 
-  // --- ДОБАВЛЕННАЯ ФУНКЦИЯ SAVE ITEM PARAMS ---
   const saveItemParams = async (id, newSize, newColor) => {
     setSavingItem(true);
-    
-    // Находим текущий товар, чтобы сохранить его количество при обновлении
     const currentItem = items.find(i => i.id === id);
     const quantity = currentItem ? currentItem.quantity : 1;
     const colorToSave = newColor || (currentItem ? currentItem.color : '');
 
-    // 1. Оптимистичное обновление UI
     setItems(prev => prev.map(item => 
       item.id === id 
         ? { ...item, size: newSize, color: colorToSave } 
@@ -118,24 +115,20 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
     ));
 
     try {
-      // 2. Отправка на вебхук (используем тот же, что и для количества)
       const res = await fetch('https://proshein.com/webhook/update-cart-item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           id: id,
           tg_id: user?.id,
-          quantity: quantity, // Передаем текущее кол-во
-          size: newSize,      // Новые параметры
+          quantity: quantity,
+          size: newSize,
           color: colorToSave
         })
       });
-
       if (!res.ok) throw new Error('Failed to update');
-
       window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
-      setEditingItem(null); // Закрываем модалку
-
+      setEditingItem(null); 
     } catch (e) {
       console.error('Ошибка сохранения параметров:', e);
       window.Telegram?.WebApp?.showAlert('Не удалось сохранить изменения');
@@ -146,18 +139,14 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
    
   const handleDeleteItem = async (e, id) => {
       if(!window.confirm('Удалить товар из корзины?')) return;
-
       setItems(prev => prev.filter(i => i.id !== id));
-
       try {
           await fetch('https://proshein.com/webhook/delete-item', { 
               method: 'POST', 
               headers: { 'Content-Type': 'application/json' }, 
               body: JSON.stringify({ id, tg_id: user?.id }) 
           });
-      } catch (e) { 
-          console.error("Ошибка удаления:", e); 
-      }
+      } catch (e) { console.error(e); }
   };
 
   // --- CALCULATIONS ---
@@ -172,32 +161,45 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       setPointsInput(num > 0 ? num.toString() : '');
   };
 
-  const applyCoupon = (codeFromModal) => {
-      const code = (codeFromModal || '').toUpperCase().trim();
-      if (!code) return;
-      
-      let discount = 0;
-      // Добавил START500
-      if (code === 'START500') discount = 500;
-      else if (code === 'WELCOME') discount = 500;
-      else if (code === 'SALE10') discount = Math.floor(subtotal * 0.1);
-      else { 
-          window.Telegram?.WebApp?.showAlert('Неверный код или купон истек'); 
-          return; 
+  // --- ОБНОВЛЕННАЯ ЛОГИКА КУПОНОВ ---
+  
+  // Эта функция вызывается из CouponModal, когда юзер выбрал купон
+  const applyCoupon = (coupon) => {
+      if (!coupon) {
+          setActiveCoupon(null);
+          setCouponDiscount(0);
+          return;
       }
 
+      // Проверка минимальной суммы
+      if (subtotal < (coupon.min_order_amount || 0)) {
+          window.Telegram?.WebApp?.showAlert(`Мин. сумма заказа для этого купона: ${coupon.min_order_amount}₽`);
+          return;
+      }
+
+      // Расчет скидки
+      let discount = 0;
+      if (coupon.type === 'percent') {
+          // Например, 10%
+          discount = Math.floor(subtotal * (coupon.discount_amount / 100));
+      } else {
+          // Фикс сумма, например 500р
+          discount = Number(coupon.discount_amount);
+      }
+
+      // Защита от отрицательной суммы
+      if (discount > subtotal) discount = subtotal;
+
       setCouponDiscount(discount);
-      setActiveCoupon(code);
+      setActiveCoupon(coupon); // Сохраняем весь объект купона
       setShowCouponModal(false);
       window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
-      window.Telegram?.WebApp?.showAlert(`Купон ${code} применен! Скидка: ${discount} ₽`);
   };
 
   const pointsUsed = parseInt(pointsInput) || 0;
   const finalTotal = Math.max(0, subtotal - couponDiscount - pointsUsed);
 
   const openCheckout = () => {
-      // Проверка, что везде выбран размер
       if (items.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
           window.Telegram?.WebApp?.showAlert('Сначала выберите размер для всех товаров!');
           return;
@@ -225,35 +227,38 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
               </div>
               <div className="h-px bg-white/5 my-4"></div>
               <PaymentBlock 
-                  subtotal={subtotal} total={finalTotal} discount={couponDiscount}
-                  pointsInput={pointsInput} setPointsInput={handlePointsChange}
-                  userPointsBalance={userPointsBalance} handleUseMaxPoints={() => handlePointsChange(userPointsBalance)}
+                  subtotal={subtotal} 
+                  total={finalTotal} 
+                  discount={couponDiscount}
+                  pointsInput={pointsInput} 
+                  setPointsInput={handlePointsChange}
+                  userPointsBalance={userPointsBalance} 
+                  handleUseMaxPoints={() => handlePointsChange(userPointsBalance)}
+                  // Передаем текущий активный код, если есть
+                  activeCouponCode={activeCoupon?.code}
                   onOpenCoupons={() => setShowCouponModal(true)}
-                  onPay={openCheckout} onPlayVideo={() => setVideoOpen(true)} 
+                  onPay={openCheckout} 
+                  onPlayVideo={() => setVideoOpen(true)} 
               />
           </div>
       )}
 
       {/* --- MODALS --- */}
-
-      {/* 1. Редактирование */}
       {editingItem && (
-        <EditItemModal 
-          item={editingItem} onClose={() => setEditingItem(null)} 
-          onSave={saveItemParams} saving={savingItem} 
-        />
+        <EditItemModal item={editingItem} onClose={() => setEditingItem(null)} onSave={saveItemParams} saving={savingItem} />
       )}
 
-      {/* 2. Купоны */}
+      {/* Передаем user.id для загрузки списка */}
       {showCouponModal && (
          <CouponModal 
+            userId={user?.id}
+            subtotal={subtotal}
             onClose={() => setShowCouponModal(false)}
             onApply={applyCoupon}
-            activeCoupon={activeCoupon}
+            activeCouponCode={activeCoupon?.code}
          />
       )}
 
-      {/* 3. Оформление заказа */}
       {showCheckout && (
         <CheckoutModal 
            onClose={(success) => { 
@@ -265,7 +270,9 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
                } 
            }}
            user={user} dbUser={dbUser}
-           total={finalTotal} items={items} pointsUsed={pointsUsed} couponDiscount={couponDiscount} activeCoupon={activeCoupon}
+           total={finalTotal} items={items} pointsUsed={pointsUsed} 
+           // Передаем скидку и объект купона
+           couponDiscount={couponDiscount} activeCoupon={activeCoupon}
            addresses={addresses} deliveryMethod={deliveryMethod} setDeliveryMethod={setDeliveryMethod}
            selectedAddress={selectedAddress} setSelectedAddress={setSelectedAddress}
            selectedPvz={selectedPvz} setSelectedPvz={setSelectedPvz}
@@ -273,7 +280,6 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
         />
       )}
 
-      {/* 4. Видео */}
       {videoOpen && <FullScreenVideo src={VIDEO_URL} onClose={() => setVideoOpen(false)} />}
     </div>
   );
