@@ -2,21 +2,42 @@ import React, { useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function OrderDetailsModal({ order, onClose }) {
-  // Если заказа нет — ничего не рендерим
   if (!order) return null;
 
-  // --- ИСПРАВЛЕНИЕ СКРОЛЛА ---
+  // --- ФУНКЦИЯ ПРИНУДИТЕЛЬНОЙ РАЗБЛОКИРОВКИ ---
+  const unlockScroll = () => {
+      // 1. Снимаем inline-стили
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      
+      // 2. На всякий случай удаляем класс tailwind, если он был добавлен
+      document.body.classList.remove('overflow-hidden');
+  };
+
+  // --- УПРАВЛЕНИЕ СКРОЛЛОМ ---
   useEffect(() => {
-    // 1. Блокируем скролл при открытии
+    // БЛОКИРУЕМ при открытии
     document.body.style.overflow = 'hidden';
-    
-    // 2. Возвращаем как было при закрытии (удаляем inline-стиль)
+    // На мобилках иногда нужно фиксировать body, чтобы не дергался фон
+    // document.body.classList.add('overflow-hidden'); // Можно раскомментировать, если нужно
+
+    // РАЗБЛОКИРУЕМ при полном удалении компонента (unmount)
     return () => {
-      document.body.style.overflow = ''; 
+      unlockScroll();
     };
   }, []);
 
-  // --- ЛОГИКА ТРЕКИНГА ---
+  // --- ОБЕРТКА ДЛЯ ЗАКРЫТИЯ ---
+  // Мы вызываем это вручную перед onClose, чтобы гарантировать сброс стилей
+  const handleClose = (e) => {
+      if (e) e.stopPropagation(); // Чтобы клик не прошел сквозь
+      unlockScroll(); // Сначала разблокируем
+      onClose(); // Потом закрываем в React
+  };
+
+  // --- ЛОГИКА ТРЕКИНГА (Та же самая) ---
   const fullHistory = useMemo(() => {
     if (!order.created_at) return [];
 
@@ -61,19 +82,19 @@ export default function OrderDetailsModal({ order, onClose }) {
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
         
-        {/* Задний фон */}
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}></div>
+        {/* Задний фон - используем handleClose */}
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={handleClose}></div>
         
         {/* Карточка */}
         <div className="relative z-10 bg-[#151c28] w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
             
-            {/* HEADER */}
+            {/* HEADER - используем handleClose */}
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-[#1a2333]">
                 <div>
                     <h2 className="font-bold text-white text-sm">Заказ #{order.id.slice(0,8).toUpperCase()}</h2>
                     <p className="text-[10px] text-white/40">{formatDate(order.created_at)}</p>
                 </div>
-                <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 text-white flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all">
+                <button onClick={handleClose} className="w-8 h-8 rounded-full bg-white/5 text-white flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all">
                     <span className="material-symbols-outlined text-lg">close</span>
                 </button>
             </div>
