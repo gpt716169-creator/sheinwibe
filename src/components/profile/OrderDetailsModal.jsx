@@ -2,15 +2,21 @@ import React, { useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function OrderDetailsModal({ order, onClose }) {
+  // Если заказа нет — ничего не рендерим
   if (!order) return null;
 
-  // Блокируем скролл фона
+  // --- ИСПРАВЛЕНИЕ СКРОЛЛА ---
   useEffect(() => {
+    // 1. Блокируем скролл при открытии
     document.body.style.overflow = 'hidden';
-    return () => document.body.style.overflow = 'auto';
+    
+    // 2. Возвращаем как было при закрытии (удаляем inline-стиль)
+    return () => {
+      document.body.style.overflow = ''; 
+    };
   }, []);
 
-  // --- ЛОГИКА ВИРТУАЛЬНОГО ТРЕКИНГА ---
+  // --- ЛОГИКА ТРЕКИНГА ---
   const fullHistory = useMemo(() => {
     if (!order.created_at) return [];
 
@@ -18,7 +24,6 @@ export default function OrderDetailsModal({ order, onClose }) {
     const now = new Date();
     const diffMinutes = (now - createdDate) / (1000 * 60);
 
-    // Сценарий (время в минутах)
     const scenario = [
       { time: 0, status: 'Заказ оформлен', location: 'Приложение' },
       { time: 15, status: 'Выкуплен на SHEIN', location: 'SHEIN' },
@@ -29,7 +34,6 @@ export default function OrderDetailsModal({ order, onClose }) {
       { time: 8 * 24 * 60, status: 'Таможенное оформление', location: 'Таможня' }
     ];
 
-    // Виртуальные статусы
     const virtualHistory = scenario
       .filter(step => diffMinutes >= step.time)
       .map(step => ({
@@ -39,13 +43,11 @@ export default function OrderDetailsModal({ order, onClose }) {
         isVirtual: true
       }));
 
-    // Реальные статусы из базы
     let realHistory = [];
     if (order.tracking_history && Array.isArray(order.tracking_history)) {
         realHistory = order.tracking_history;
     }
 
-    // Объединяем и сортируем (новые сверху)
     const combined = [...virtualHistory, ...realHistory];
     return combined.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [order]);
@@ -55,14 +57,15 @@ export default function OrderDetailsModal({ order, onClose }) {
       return new Date(dateString).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  // --- РЕНДЕР (Вернули дизайн карточки) ---
+  // --- РЕНДЕР ---
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-        {/* Задний фон (затемнение) */}
+        
+        {/* Задний фон */}
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}></div>
         
-        {/* Сама карточка (по центру) */}
-        <div className="relative z-10 bg-[#151c28] w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
+        {/* Карточка */}
+        <div className="relative z-10 bg-[#151c28] w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
             
             {/* HEADER */}
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-[#1a2333]">
@@ -70,19 +73,18 @@ export default function OrderDetailsModal({ order, onClose }) {
                     <h2 className="font-bold text-white text-sm">Заказ #{order.id.slice(0,8).toUpperCase()}</h2>
                     <p className="text-[10px] text-white/40">{formatDate(order.created_at)}</p>
                 </div>
-                <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 text-white flex items-center justify-center hover:bg-white/10">
+                <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 text-white flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all">
                     <span className="material-symbols-outlined text-lg">close</span>
                 </button>
             </div>
 
-            {/* SCROLLABLE CONTENT */}
+            {/* SCROLLABLE BODY */}
             <div className="overflow-y-auto p-4 space-y-5 hide-scrollbar">
                 
-                {/* 1. ТРЕКИНГ (Новая логика) */}
+                {/* ИСТОРИЯ СТАТУСОВ */}
                 <div>
                     <h3 className="text-white/40 text-[10px] uppercase font-bold mb-3 tracking-wider">История статусов</h3>
                     <div className="relative pl-2 space-y-0">
-                        {/* Линия */}
                         <div className="absolute top-2 bottom-2 left-[11px] w-0.5 bg-white/10"></div>
                         
                         {fullHistory.length === 0 ? (
@@ -110,7 +112,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                     </div>
                 </div>
 
-                {/* 2. ТОВАРЫ (Старая логика) */}
+                {/* ТОВАРЫ */}
                 <div>
                     <h3 className="text-white/40 text-[10px] uppercase font-bold mb-3 tracking-wider pt-4 border-t border-white/5">Товары</h3>
                     <div className="space-y-2">
@@ -133,7 +135,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                     </div>
                 </div>
 
-                {/* 3. ДЕТАЛИ ЗАКАЗА */}
+                {/* ДЕТАЛИ ЗАКАЗА */}
                 <div className="pt-3 border-t border-white/5 text-xs space-y-2">
                      <div className="flex justify-between">
                          <span className="text-white/50">Получатель</span>
@@ -153,7 +155,7 @@ export default function OrderDetailsModal({ order, onClose }) {
 
             </div>
 
-            {/* FOOTER (TOTAL) */}
+            {/* FOOTER */}
             <div className="p-4 bg-[#1a2333] border-t border-white/5 shrink-0 flex justify-between items-center">
                 <span className="text-sm text-white/60">Итого:</span>
                 <span className="text-lg font-bold text-primary">{Number(order.total_amount).toLocaleString()} ₽</span>
