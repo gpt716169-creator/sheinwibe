@@ -13,7 +13,7 @@ export default function Home({ user, dbUser, setActiveTab }) {
   // Состояние для видео-инструкции
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
-  const TUTORIAL_VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/vkclips_20251219084052.mp4";
+  const TUTORIAL_VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/%D0%9D%D0%BE%D0%B2%D0%BE%D0%B5%20%D0%B2%D0%B8%D0%B4%D0%B5%D0%BE%20(1).mp4";
    
   // Ссылка на VPN
   const VPN_LINK = "https://t.me/hitvpnbot?start=187358585644246";
