@@ -148,9 +148,12 @@ export default function OrderDetailsModal({ order, onClose }) {
                                     </div>
                                 </div>
                                 <div className="flex flex-col justify-center text-right">
-                                    <span className="text-xs text-white font-bold">{Math.floor(item.final_price_rub || 0)} ₽</span>
-                                    <span className="text-[10px] text-white/40">x{item.quantity}</span>
-                                </div>
+    {/* ИСПРАВЛЕНО: Добавили price_at_purchase первым приоритетом */}
+    <span className="text-xs text-white font-bold">
+        {Math.floor(item.price_at_purchase || item.final_price_rub || 0)} ₽
+    </span>
+    <span className="text-[10px] text-white/40">x{item.quantity}</span>
+</div>
                             </div>
                         ))}
                     </div>
