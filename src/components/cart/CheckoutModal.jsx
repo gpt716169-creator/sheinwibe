@@ -62,7 +62,18 @@ export default function CheckoutModal({
 
       if (deliveryMethod === 'ПВЗ (5Post)') {
           finalAddress = `5Post: ${selectedPvz.city}, ${selectedPvz.address}`;
-          pickupInfo = { id: selectedPvz.id, postal_code: '000000' };
+          
+          // === ИСПРАВЛЕНИЕ ID ПОСТАМАТА ===
+          // 1. Сначала ищем pickup_point_id (это настоящий ID постамата, если адрес был сохранен ранее)
+          // 2. Если его нет, берем id (это если пользователь выбрал точку прямо из поиска и она еще не сохранена как "адрес")
+          const realPointId = selectedPvz.pickup_point_id || selectedPvz.id;
+          
+          // 3. На всякий случай чистим от "saved_", если вдруг он туда попал
+          const cleanId = realPointId ? String(realPointId).replace('saved_', '') : null;
+
+          pickupInfo = { id: cleanId, postal_code: '000000' };
+          // ================================
+
       } else {
           finalAddress = [selectedAddress.region, selectedAddress.city, selectedAddress.street, selectedAddress.house, selectedAddress.flat].filter(Boolean).join(', ');
       }
@@ -77,7 +88,7 @@ export default function CheckoutModal({
                 email: form.email,
                 address: finalAddress,
                 delivery_method: deliveryMethod,
-                pickup_point_id: pickupInfo?.id,
+                pickup_point_id: pickupInfo?.id, // Теперь тут чистый UUID
                 postal_code: pickupInfo?.postal_code
             },
             items: items,
