@@ -35,53 +35,79 @@ export default function CheckoutModal({
       }
   };
 
-  const handlePay = async () => {
-      // Проверки выбора адреса
+ const handlePay = async () => {
+      // 1. Проверки (оставь свои стандартные проверки)
       if (deliveryMethod === 'ПВЗ (5Post)' && !selectedPvz) {
-          window.Telegram?.WebApp?.showAlert('Выберите магазин 5Post из списка'); return;
+          window.Telegram?.WebApp?.showAlert('Выберите магазин 5Post'); return;
       }
       if (deliveryMethod !== 'ПВЗ (5Post)' && !selectedAddress) {
-          window.Telegram?.WebApp?.showAlert('Выберите адрес доставки из списка'); return;
+          window.Telegram?.WebApp?.showAlert('Выберите адрес доставки'); return;
       }
-
-      // Валидация контактов
-      if (!form.name || form.name.length < 2) { 
-          window.Telegram?.WebApp?.showAlert('В выбранном адресе не указано ФИО получателя. Исправьте это в профиле.'); return; 
+      if (!form.name || form.name.length < 2 || !form.phone) { 
+          window.Telegram?.WebApp?.showAlert('Заполните контакты'); return; 
       }
-      if (!form.phone) { 
-          window.Telegram?.WebApp?.showAlert('В выбранном адресе не указан телефон. Исправьте это в профиле.'); return; 
-      }
-
       if (!form.agreed || !form.customsAgreed) {
-          window.Telegram?.WebApp?.showAlert('Примите условия оферты и таможни'); return;
+          window.Telegram?.WebApp?.showAlert('Примите оферту'); return;
       }
 
+      // 2. Сборка адреса (твой код, который мы починили)
       let finalAddress = '';
       let pickupInfo = null;
-      let finalPostalCode = '000000'; // Значение по умолчанию
+      let finalPostalCode = '000000';
 
       if (deliveryMethod === 'ПВЗ (5Post)') {
           finalAddress = `5Post: ${selectedPvz.city}, ${selectedPvz.address}`;
-          
           const realPointId = selectedPvz.pickup_point_id || selectedPvz.id;
           const cleanId = realPointId ? String(realPointId).replace('saved_', '') : null;
-
-          // === ИЗМЕНЕНИЕ 1: Берем индекс из базы, если он там есть ===
           finalPostalCode = selectedPvz.postal_code || '000000';
-          // ==========================================================
-
           pickupInfo = { id: cleanId, postal_code: finalPostalCode };
-
       } else {
-          // Логика для Почты РФ
           finalAddress = [selectedAddress.region, selectedAddress.city, selectedAddress.street, selectedAddress.house, selectedAddress.flat].filter(Boolean).join(', ');
-          
-          // === ИЗМЕНЕНИЕ 2: Берем индекс для Почты РФ из сохраненного адреса ===
           finalPostalCode = selectedAddress.postal_code || ''; 
-          // Если в базе пусто (старый адрес), можно попытаться выдернуть из строки, 
-          // но сейчас мы рассчитываем, что колонка postal_code заполнена.
-          // ====================================================================
       }
+
+      setLoading(true);
+      try {
+          const payload = {
+            tg_id: user?.id,
+            user_info: {
+                name: form.name,
+                phone: form.phone,
+                email: form.email, // <--- ВАЖНО ДЛЯ ЧЕКА
+                address: finalAddress,
+                delivery_method: deliveryMethod,
+                pickup_point_id: pickupInfo?.id,
+                postal_code: finalPostalCode
+            },
+            items: items,
+            items_total: (total + pointsUsed + couponDiscount), 
+            final_total: total, // Сумма к оплате
+            points_used: pointsUsed, 
+            coupon_code: activeCoupon,
+            coupon_discount: couponDiscount
+          };
+
+          // Шлем на тот же вебхук, но теперь он вернет ссылку
+          const res = await fetch('https://proshein.com/webhook/create-order', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify(payload)
+          });
+
+          const json = await res.json();
+
+          if (json.status === 'success' && json.payment_url) {
+              // ПЕРЕАДРЕСАЦИЯ НА РОБОКАССУ
+              window.location.href = json.payment_url;
+          } else {
+              throw new Error(json.message || 'Ошибка сервера');
+          }
+
+      } catch (e) {
+          window.Telegram?.WebApp?.showAlert('Ошибка: ' + e.message);
+          setLoading(false);
+      }
+  };
 
       setLoading(true);
       try {
