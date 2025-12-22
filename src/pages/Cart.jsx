@@ -5,7 +5,7 @@ import FullScreenVideo from '../components/ui/FullScreenVideo';
 import EditItemModal from '../components/cart/EditItemModal';
 import CheckoutModal from '../components/cart/CheckoutModal';
 import CouponModal from '../components/cart/CouponModal';
-
+import { supabase } from '../supabaseClient';
 export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   // --- STATE: DATA ---
   const [items, setItems] = useState([]);
@@ -70,10 +70,19 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
   const loadAddresses = async () => {
       try {
-          const res = await fetch(`https://proshein.com/webhook/get-addresses?tg_id=${user?.id}`);
-          const json = await res.json();
-          setAddresses(json.addresses || []);
-      } catch (e) { console.error("Ошибка загрузки адресов:", e); }
+          // МЫ ЗАМЕНИЛИ ВЕБХУК НА ПРЯМОЙ ЗАПРОС К БАЗЕ
+          // И явно запрашиваем pickup_point_id
+          const { data, error } = await supabase
+              .from('user_addresses')
+              .select('*, pickup_point_id') 
+              .eq('user_id', user?.id)
+              .order('is_default', { ascending: false }); // Сортируем: дефолтный первый
+
+          if (error) throw error;
+          setAddresses(data || []);
+      } catch (e) { 
+          console.error("Ошибка загрузки адресов:", e); 
+      }
   };
 
   // --- ACTIONS ---
