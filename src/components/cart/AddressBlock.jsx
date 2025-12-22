@@ -12,22 +12,24 @@ export default function AddressBlock({
   const courierAddresses = addresses.filter(addr => !((addr.street+addr.city+(addr.region||'')).toLowerCase().includes('5post')));
   const saved5PostAddresses = addresses.filter(addr => (addr.street+addr.city+(addr.region||'')).toLowerCase().includes('5post'));
 
-  const handleSelectSavedPvz = (addr) => {
+ const handleSelectSavedPvz = (addr) => {
       // Отладка
       console.log("Выбрали адрес:", addr);
 
       setSelectedPvz({
-          ...addr, // Копируем всё из базы (id, pickup_point_id, POSTAL_CODE)
+          ...addr, // Копируем базу
           
-          // Перезаписываем только технические поля для UI
           id: 'saved_' + addr.id, 
           name: 'Сохраненный пункт',
-          
-          // === ИСПРАВЛЕНИЕ ===
-          // Если в базе есть индекс - берем его. Если нет - ставим нули.
           postal_code: addr.postal_code || '000000',
-          address: addr.street
-          // ===================
+
+          // === FIX 1: АДРЕС ===
+          // CheckoutModal ищет .address, а в базе это .street
+          address: addr.street,
+
+          // === FIX 2: ГОРОД ===
+          // Если поля city нет, берем из region (Supabase часто хранит город там)
+          city: addr.city || addr.region || '' 
       });
 
       if (onFillFromAddress) onFillFromAddress(addr);
