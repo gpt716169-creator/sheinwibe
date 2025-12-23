@@ -15,8 +15,9 @@ export default function Home({ user, dbUser, setActiveTab }) {
 
   const TUTORIAL_VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/%D0%BF%D1%80%D0%BE%D1%82%D0%BE%D1%82%D0%B8%D0%BF%20(1).mp4";
    
-  // Ссылка на VPN
+  // Ссылки
   const VPN_LINK = "https://t.me/hitvpnbot?start=187358585644246";
+  const SHEIN_LINK = "https://m.shein.com/"; // Универсальная ссылка
 
   useEffect(() => {
     if (user?.id) {
@@ -56,8 +57,12 @@ export default function Home({ user, dbUser, setActiveTab }) {
   };
 
   const openVpn = () => {
-      // Используем нативный метод открытия ссылки внутри Telegram
       window.Telegram?.WebApp?.openTelegramLink(VPN_LINK);
+  };
+
+  const openShein = () => {
+      // openLink открывает во внешнем браузере или приложении
+      window.Telegram?.WebApp?.openLink(SHEIN_LINK);
   };
 
   return (
@@ -95,11 +100,10 @@ export default function Home({ user, dbUser, setActiveTab }) {
                 onGoToOrders={() => setActiveTab('profile')} 
             />
 
-            {/* 4. БЛОК ССЫЛОК (Отзывы, Видео, VPN) */}
+            {/* 4. БЛОК ССЫЛОК */}
             <div className="space-y-3">
-                {/* Заголовок "Помощь" убрали, теперь это общий список */}
                 
-                {/* Отзывы (Новый дизайн) */}
+                {/* Отзывы */}
                 <ReviewsBanner />
 
                 {/* Видео */}
@@ -116,6 +120,21 @@ export default function Home({ user, dbUser, setActiveTab }) {
                         <p className="text-white/40 text-xs">Видео-инструкция (45 сек)</p>
                     </div>
                     <span className="material-symbols-outlined text-white/20">chevron_right</span>
+                </div>
+
+                {/* --- НОВАЯ КНОПКА: SHEIN APP --- */}
+                <div 
+                    onClick={openShein} 
+                    className="bg-black/60 border border-white/10 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-black/80 transition-colors active:scale-[0.98]"
+                >
+                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-black font-extrabold text-lg shrink-0">
+                        S
+                    </div>
+                    <div className="flex-1">
+                        <h4 className="text-white font-bold text-sm">Перейти в SHEIN</h4>
+                        <p className="text-white/40 text-xs">Выбрать товары в приложении</p>
+                    </div>
+                    <span className="material-symbols-outlined text-white/20">open_in_new</span>
                 </div>
 
                 {/* VPN */}
