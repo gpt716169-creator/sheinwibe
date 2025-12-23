@@ -6,9 +6,14 @@ export default function OrdersTab({ orders = [] }) {
 
   // --- ЛОГИКА ОПРЕДЕЛЕНИЯ СТАТУСА ---
   const getOrderStatus = (order) => {
-    // 1. Если заказ отменен или доставлен (финальные статусы из базы)
+    // 1. ФИНАЛЬНЫЕ И ВАЖНЫЕ СТАТУСЫ (Берем жестко из базы)
     if (order.status === 'cancelled') return { text: 'Отменен', color: 'text-red-500 bg-red-500/10' };
     if (order.status === 'completed') return { text: 'Доставлен', color: 'text-green-500 bg-green-500/10' };
+    
+    // === НОВОЕ: Если статус "waiting_for_pay", то показываем это и НЕ считаем время ===
+    if (order.status === 'waiting_for_pay') {
+        return { text: 'Ожидает оплаты', color: 'text-orange-400 bg-orange-400/10 border border-orange-400/20' };
+    }
 
     // 2. Если есть реальная история трекинга (из CDEK/5Post), берем самый свежий статус
     if (order.tracking_history && Array.isArray(order.tracking_history) && order.tracking_history.length > 0) {
@@ -17,7 +22,8 @@ export default function OrdersTab({ orders = [] }) {
        return { text: sorted[0].status, color: 'text-primary bg-primary/10' };
     }
 
-    // 3. Иначе считаем ВИРТУАЛЬНЫЙ статус по времени (как в модалке)
+    // 3. Иначе считаем ВИРТУАЛЬНЫЙ статус по времени
+    // (Сюда код дойдет ТОЛЬКО если статус Paid или другой, но не waiting_for_pay)
     if (!order.created_at) return { text: 'В обработке', color: 'text-white/50 bg-white/5' };
 
     const diffMinutes = (new Date() - new Date(order.created_at)) / (1000 * 60);
@@ -30,6 +36,7 @@ export default function OrdersTab({ orders = [] }) {
     if (diffMinutes >= 1 * 24 * 60) return { text: 'Сборка', color: 'text-yellow-400 bg-yellow-400/10' };
     if (diffMinutes >= 15) return { text: 'Выкуплен', color: 'text-emerald-400 bg-emerald-400/10' };
 
+    // Если прошло меньше 15 минут и статус Paid
     return { text: 'Оформлен', color: 'text-white/70 bg-white/10' };
   };
 
