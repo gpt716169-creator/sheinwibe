@@ -27,31 +27,47 @@ export default function OrderDetailsModal({ order, onClose }) {
   };
 
   // --- ЛОГИКА ПОВТОРНОЙ ОПЛАТЫ (Как в CheckoutModal) ---
-  const handleRepay = async () => {
-      setPaying(true);
-      try {
-          // Отправляем запрос
-          const res = await fetch('https://proshein.com/webhook/get-payment-link', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ order_id: order.id })
-          });
+ const handleRepay = async () => {
+    if (paying) return;
 
-          const json = await res.json();
+    setPaying(true);
 
-          // === ПРОВЕРКА КАК В КОРЗИНЕ ===
-          if (json.status === 'success' && json.payment_url) {
-              // НЕ показываем алерт, сразу редирект
-              window.location.href = json.payment_url;
-          } else {
-              throw new Error(json.message || 'Ошибка генерации ссылки');
+    try {
+        const res = await fetch(
+          'https://proshein.com/webhook/get-payment-link',
+          {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ order_id: order.id })
           }
+        );
 
-      } catch (e) {
-          window.Telegram?.WebApp?.showAlert('Ошибка: ' + e.message);
-          setPaying(false);
-      }
-  };
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const json = await res.json();
+
+        if (json.status === 'success' && json.payment_url) {
+            if (window.Telegram?.WebApp?.openLink) {
+                window.Telegram.WebApp.openLink(json.payment_url);
+            } else {
+                window.location.href = json.payment_url;
+            }
+        } else {
+            throw new Error(json.message || 'Ошибка генерации ссылки');
+        }
+
+    } catch (e) {
+        if (window.Telegram?.WebApp?.showAlert) {
+            window.Telegram.WebApp.showAlert('Ошибка оплаты. Попробуйте позже.');
+        } else {
+            alert('Ошибка оплаты. Попробуйте позже.');
+        }
+    } finally {
+        setPaying(false);
+    }
+};
 
   // --- ОЧИСТКА АДРЕСА ---
   const formatAddress = (addr) => {
