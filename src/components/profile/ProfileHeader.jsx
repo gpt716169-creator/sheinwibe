@@ -2,26 +2,32 @@ import React from 'react';
 
 export default function ProfileHeader({ user, dbUser }) {
   
-  // 1. Достаем название статуса (или Bronze, если пусто)
-  const statusName = dbUser?.status_level || 'Bronze';
-  
-  // 2. Функция, которая отдает ЦВЕТА в зависимости от названия
-  const getStatusStyle = (status) => {
-      // Приводим к нижнему регистру для надежности сравнения
-      const s = String(status).toLowerCase();
+  // 1. Берем РЕАЛЬНЫЕ цифры из базы
+  const totalSpent = Number(dbUser?.total_spent || 0); // Деньги (для статуса)
+  const points = dbUser?.points || 0;                  // Баллы (просто показать)
 
-      if (s.includes('platinum')) {
-          return 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20 shadow-[0_0_10px_rgba(34,211,238,0.2)]';
+  // 2. ЛОГИКА РАСЧЕТА СТАТУСА (Точь-в-точь как в LoyaltyCard)
+  const getCalculatedStatus = (spent) => {
+      if (spent >= 150000) return 'Platinum';
+      if (spent >= 50000)  return 'Gold';
+      if (spent >= 15000)  return 'Silver';
+      return 'Bronze';
+  };
+
+  const currentStatus = getCalculatedStatus(totalSpent);
+
+  // 3. СТИЛИ (Цвета для статусов)
+  const getStatusStyle = (status) => {
+      switch (status) {
+          case 'Platinum':
+              return 'text-slate-200 bg-slate-500/20 border-slate-400/30 shadow-[0_0_15px_rgba(226,232,240,0.2)]';
+          case 'Gold':
+              return 'text-yellow-400 bg-yellow-500/10 border-yellow-400/30 shadow-[0_0_15px_rgba(250,204,21,0.2)]';
+          case 'Silver':
+              return 'text-gray-300 bg-gray-500/10 border-gray-400/30 shadow-[0_0_10px_rgba(209,213,219,0.1)]';
+          default: // Bronze
+              return 'text-orange-400 bg-orange-500/10 border-orange-500/30 shadow-[0_0_10px_rgba(251,146,60,0.1)]';
       }
-      if (s.includes('gold')) {
-          return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20 shadow-[0_0_10px_rgba(250,204,21,0.2)]';
-      }
-      if (s.includes('silver')) {
-          return 'text-gray-300 bg-gray-300/10 border-gray-300/20';
-      }
-      
-      // По умолчанию (Bronze)
-      return 'text-[#cd7f32] bg-[#cd7f32]/10 border-[#cd7f32]/20';
   };
 
   return (
@@ -38,14 +44,14 @@ export default function ProfileHeader({ user, dbUser }) {
          {/* ИНФО */}
          <div className="flex gap-2 mt-2">
              
-             {/* СТАТУС (Динамический стиль) */}
-             <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider transition-all ${getStatusStyle(statusName)}`}>
-                {statusName}
+             {/* СТАТУС (Рассчитанный по total_spent) */}
+             <span className={`px-4 py-1 rounded-full text-xs font-bold border uppercase tracking-wider transition-all ${getStatusStyle(currentStatus)}`}>
+                {currentStatus}
              </span>
 
-             {/* БАЛЛЫ */}
+             {/* БАЛЛЫ (WIBE) */}
              <span className="px-3 py-1 bg-primary/10 rounded-full text-xs font-bold text-primary border border-primary/20">
-                {dbUser?.points || 0} WIBE
+                {points} WIBE
              </span>
          </div>
     </div>
