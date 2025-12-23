@@ -8,15 +8,20 @@ export default function ActiveOrders({ orders, onGoToOrders }) {
 
   const latestOrder = activeOrders[0];
 
-  // --- ЛОГИКА СТАТУСА (Та же самая) ---
+  // --- ЛОГИКА СТАТУСА ---
   const getSmartStatus = (order) => {
-    // 1. Реальные треки
+    // 1. ФИНАЛЬНЫЕ И ВАЖНЫЕ (waiting_for_pay)
+    if (order.status === 'waiting_for_pay') {
+        return { text: 'Ожидает оплаты', color: 'text-orange-400 bg-orange-400/10 border-orange-400/20 shadow-[0_0_10px_rgba(249,115,22,0.2)]' };
+    }
+
+    // 2. Реальные треки
     if (order.tracking_history && Array.isArray(order.tracking_history) && order.tracking_history.length > 0) {
        const sorted = [...order.tracking_history].sort((a, b) => new Date(b.date) - new Date(a.date));
        return { text: sorted[0].status, color: 'text-primary bg-primary/10 border-primary/20' };
     }
 
-    // 2. Виртуальный трекинг
+    // 3. Виртуальный трекинг
     if (!order.created_at) return { text: 'В обработке', color: 'text-white/50 bg-white/5 border-white/10' };
 
     const diffMinutes = (new Date() - new Date(order.created_at)) / (1000 * 60);
