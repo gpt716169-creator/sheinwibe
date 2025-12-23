@@ -17,7 +17,9 @@ export default function Home({ user, dbUser, setActiveTab }) {
    
   // Ссылки
   const VPN_LINK = "https://t.me/hitvpnbot?start=187358585644246";
-  const SHEIN_LINK = "https://m.shein.com/"; 
+  
+  // Новая ссылка-джампер (Deep Link)
+  const SHEIN_LINK = "https://api-shein.shein.com/h5/sharejump/appjump?lan=ru&country=RU"; 
 
   // --- ЭФФЕКТЫ ---
   useEffect(() => {
@@ -63,11 +65,12 @@ export default function Home({ user, dbUser, setActiveTab }) {
   };
 
   const openShein = () => {
-      // openLink с параметром try_instant_view: false заставляет Телеграм
-      // передать ссылку системе, что позволит телефону открыть приложение Shein
+      // openLink с флагом try_instant_view: false - это лучший способ заставить 
+      // Телеграм отдать ссылку системе, чтобы та открыла приложение
       if (window.Telegram?.WebApp?.openLink) {
           window.Telegram.WebApp.openLink(SHEIN_LINK, { try_instant_view: false });
       } else {
+          // Если открыли не в телеге
           window.open(SHEIN_LINK, '_blank');
       }
   };
