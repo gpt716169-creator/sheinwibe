@@ -14,25 +14,31 @@ function App() {
     window.scrollTo(0, 0);
   }, [activeTab]);
 
-  // --- НОВОЕ: ПРОВЕРКА ВОЗВРАТА С ОПЛАТЫ ---
+  // --- НОВОЕ: ПРОВЕРКА ВОЗВРАТА С ОПЛАТЫ (ПО ПУТИ URL) ---
   useEffect(() => {
-      // Читаем параметры из адресной строки (куда нас вернула Робокасса)
-      const params = new URLSearchParams(window.location.search);
-      const status = params.get('payment');
+      // Читаем путь из адресной строки (например, "/success")
+      const path = window.location.pathname;
 
-      if (status === 'success') {
+      // Проверяем на успех (учитываем возможный слеш в конце)
+      if (path === '/success' || path === '/success/') {
           // 1. Показываем сообщение
           window.Telegram?.WebApp?.showAlert("Оплата прошла успешно! Ваш заказ принят в работу.");
-          // 2. Перекидываем в профиль (чтобы юзер увидел свой новый заказ в списке)
+          
+          // 2. Перекидываем в профиль
           setActiveTab('profile');
-          // 3. Чистим URL, чтобы убрать "?payment=success" (красота)
-          window.history.replaceState(null, '', window.location.pathname);
+          
+          // 3. Чистим URL (возвращаем на главную, чтобы при обновлении не всплывало снова)
+          window.history.replaceState(null, '', '/');
       } 
-      else if (status === 'fail') {
+      // Проверяем на ошибку
+      else if (path === '/fail' || path === '/fail/') {
           window.Telegram?.WebApp?.showAlert("Оплата не прошла или была отменена.");
-          // Можно оставить на главной или отправить в корзину
+          
+          // Возвращаем в корзину
           setActiveTab('cart'); 
-          window.history.replaceState(null, '', window.location.pathname);
+          
+          // Чистим URL
+          window.history.replaceState(null, '', '/');
       }
   }, []);
   // ------------------------------------------
