@@ -6,13 +6,10 @@ import ReferralTab from '../components/profile/ReferralTab';
 import OrderDetailsModal from '../components/profile/OrderDetailsModal';
 import AddressModal from '../components/profile/AddressModal';
 
-// Ссылка формируется автоматически от текущего домена
 const OFFER_LINK = window.location.origin + '/offer.pdf';
 
 export default function Profile({ user, dbUser }) {
-  // --- STATE ---
   const [activeTab, setActiveTab] = useState('orders'); 
-  
   const [orders, setOrders] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -22,17 +19,14 @@ export default function Profile({ user, dbUser }) {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
 
-  // --- НОВАЯ ЛОГИКА: ПЕРЕХОД ИЗ КОРЗИНЫ ---
   useEffect(() => {
     const redirectTab = sessionStorage.getItem('open_profile_tab');
     if (redirectTab === 'addresses') {
         setActiveTab('addresses');
-        sessionStorage.removeItem('open_profile_tab'); // Очищаем флаг
+        sessionStorage.removeItem('open_profile_tab'); 
     }
   }, []);
-  // ----------------------------------------
 
-  // --- LOAD DATA ---
   useEffect(() => {
     if (user?.id) {
         loadOrders();
@@ -40,13 +34,28 @@ export default function Profile({ user, dbUser }) {
     }
   }, [user]);
 
+  // --- ИСПРАВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ ---
   const loadOrders = async () => {
       try {
           const res = await fetch(`https://proshein.com/webhook/get-orders?tg_id=${user.id}`);
           const json = await res.json();
-          setOrders(json.orders || json.items || []);
-      } catch (e) { console.error(e); }
+          
+          // Проверяем формат ответа, чтобы не получить пустой экран
+          let data = [];
+          if (Array.isArray(json)) {
+             data = json; // Если пришел чистый массив
+          } else if (json.orders) {
+             data = json.orders; // Если пришел объект { orders: [...] }
+          } else if (json.items) {
+             data = json.items; 
+          }
+          
+          setOrders(data || []);
+      } catch (e) { 
+          console.error("Ошибка загрузки заказов:", e); 
+      }
   };
+  // -------------------------------------
 
   const loadAddresses = async () => {
       setLoadingData(true);
@@ -58,17 +67,13 @@ export default function Profile({ user, dbUser }) {
       finally { setLoadingData(false); }
   };
 
-  // --- HANDLERS ---
   const handleSaveAddress = async (addressData) => {
       window.Telegram?.WebApp?.MainButton.showProgress();
       try {
           const res = await fetch('https://proshein.com/webhook/save-address', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  tg_id: user.id,
-                  address: addressData 
-              })
+              body: JSON.stringify({ tg_id: user.id, address: addressData })
           });
           const json = await res.json();
           if (json.status === 'success') {
@@ -89,35 +94,21 @@ export default function Profile({ user, dbUser }) {
   const handleDeleteAddress = async (addressId, e) => {
       e.stopPropagation();
       if(!window.confirm("Вы точно хотите удалить этот адрес?")) return;
-      
       const newAddresses = addresses.filter(a => a.id !== addressId);
       setAddresses(newAddresses);
-
       try {
           await fetch('https://proshein.com/webhook/delete-address', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: addressId, tg_id: user.id })
           });
-      } catch (e) { 
-          console.error("Delete error:", e);
-          loadAddresses();
-      }
+      } catch (e) { loadAddresses(); }
   };
 
-  const openNewAddress = () => {
-      setEditingAddress(null);
-      setIsAddressModalOpen(true);
-  };
+  const openNewAddress = () => { setEditingAddress(null); setIsAddressModalOpen(true); };
+  const openEditAddress = (addr) => { setEditingAddress(addr); setIsAddressModalOpen(true); };
 
-  const openEditAddress = (addr) => {
-      setEditingAddress(addr);
-      setIsAddressModalOpen(true);
-  };
-
-  // --- ФУНКЦИЯ ОТКРЫТИЯ ОФЕРТЫ ---
   const openOffer = () => {
-    // Используем нативный метод Telegram для открытия ссылок во внешнем браузере
     if (window.Telegram?.WebApp?.openLink) {
         window.Telegram.WebApp.openLink(OFFER_LINK, { try_instant_view: false });
     } else {
@@ -125,14 +116,10 @@ export default function Profile({ user, dbUser }) {
     }
   };
 
-  // --- RENDER ---
   return (
     <div className="flex flex-col h-screen pb-24 animate-fade-in overflow-y-auto">
-        
-        {/* HEADER */}
         <ProfileHeader user={user} dbUser={dbUser} />
 
-        {/* TABS */}
         <div className="px-6 mb-6 shrink-0">
             <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
                 <button onClick={() => setActiveTab('orders')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'orders' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'}`}>Заказы</button>
@@ -141,9 +128,9 @@ export default function Profile({ user, dbUser }) {
             </div>
         </div>
 
-        {/* CONTENT (С flex-1, чтобы толкать футер вниз) */}
         <div className="flex-1">
             {activeTab === 'orders' && (
+                // ТЕПЕРЬ ВСЕ РАБОТАЕТ: orders передаются, а клик обрабатывает Profile (открывая модалку)
                 <OrdersTab orders={orders} onSelectOrder={setSelectedOrder} />
             )}
 
@@ -162,21 +149,14 @@ export default function Profile({ user, dbUser }) {
             )}
         </div>
 
-        {/* --- FOOTER: ОФЕРТА --- */}
         <div className="p-6 mt-4 flex flex-col items-center justify-center opacity-50 hover:opacity-100 transition-opacity">
-            <button 
-                onClick={openOffer}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest text-white/40 hover:text-white hover:bg-white/5 transition-all"
-            >
+            <button onClick={openOffer} className="flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest text-white/40 hover:text-white hover:bg-white/5 transition-all">
                 <span className="material-symbols-outlined text-lg">description</span>
                 Договор оферты
             </button>
-            <div className="text-[9px] text-white/20 mt-2">
-                SHEINWIBE © 2025
-            </div>
+            <div className="text-[9px] text-white/20 mt-2">SHEINWIBE © 2025</div>
         </div>
 
-        {/* MODALS */}
         <OrderDetailsModal 
             order={selectedOrder} 
             onClose={() => setSelectedOrder(null)} 
