@@ -30,8 +30,8 @@ export default function OrderDetailsModal({ order, onClose }) {
   const handleRepay = async () => {
       setPaying(true);
       try {
-          // Стучимся на новый вебхук для генерации ссылки
-          const res = await fetch('https://proshein.com/webhook/get-payment-lin', {
+          // ❗ ИСПРАВЛЕНА ОПЕЧАТКА: добавлена 'k' в конце
+          const res = await fetch('https://proshein.com/webhook/get-payment-link', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({ order_id: order.id })
@@ -46,9 +46,19 @@ export default function OrderDetailsModal({ order, onClose }) {
               setPaying(false);
           }
       } catch (e) {
-          window.Telegram?.WebApp?.showAlert("Ошибка сети");
+          window.Telegram?.WebApp?.showAlert("Ошибка сети. Проверьте подключение.");
           setPaying(false);
       }
+  };
+
+  // --- ОЧИСТКА АДРЕСА (Убираем дубли "Москва г") ---
+  const formatAddress = (addr) => {
+      if (!addr) return 'Адрес не указан';
+      // Заменяем "Москва г, Москва г" на один раз
+      let clean = addr.replace(/Москва г,\s*Москва г/gi, 'Москва г');
+      // Убираем лишние запятые в начале
+      clean = clean.replace(/^,\s*/, '');
+      return clean;
   };
 
   // --- ЛОГИКА ТРЕКИНГА ---
@@ -184,17 +194,25 @@ export default function OrderDetailsModal({ order, onClose }) {
                 </div>
 
                 {/* ДЕТАЛИ ЗАКАЗА */}
-                <div className="pt-3 border-t border-white/5 text-xs space-y-2">
-                      <div className="flex justify-between">
-                          <span className="text-white/50">Получатель</span>
-                          <span className="text-white text-right max-w-[60%] truncate">{order.contact_name || order.user_info?.name || 'Не указано'}</span>
+                <div className="pt-3 border-t border-white/5 text-xs space-y-3">
+                      <div className="flex flex-col gap-1">
+                          <span className="text-white/50 text-[10px] uppercase font-bold">Получатель</span>
+                          {/* УБРАЛ TRUNCATE, добавил перенос слов */}
+                          <span className="text-white break-words leading-tight">
+                             {order.contact_name || order.user_info?.name || 'Не указано'}
+                          </span>
                       </div>
-                      <div className="flex justify-between">
-                          <span className="text-white/50">Доставка</span>
-                          <span className="text-white text-right max-w-[60%] truncate">{order.delivery_address || 'Адрес не указан'}</span>
+                      
+                      <div className="flex flex-col gap-1">
+                          <span className="text-white/50 text-[10px] uppercase font-bold">Доставка</span>
+                          {/* Используем функцию очистки адреса */}
+                          <span className="text-white break-words leading-tight">
+                             {formatAddress(order.delivery_address)}
+                          </span>
                       </div>
+
                       {order.tracking_number && (
-                         <div className="flex justify-between items-center pt-1">
+                         <div className="flex justify-between items-center pt-2 border-t border-white/5 mt-1">
                              <span className="text-white/50">Трек-номер</span>
                              <span className="font-mono bg-white/10 px-2 py-0.5 rounded text-white select-all">{order.tracking_number}</span>
                          </div>
