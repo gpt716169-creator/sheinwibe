@@ -31,7 +31,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       setPaying(true);
       try {
           // Стучимся на новый вебхук для генерации ссылки
-          const res = await fetch('https://proshein.com/webhook/get-payment-link', {
+          const res = await fetch('https://proshein.com/webhook/get-payment-lin', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({ order_id: order.id })
