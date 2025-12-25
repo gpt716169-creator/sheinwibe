@@ -11,7 +11,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   // --- STATE: DATA ---
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+   
   // === НОВОЕ: ID выбранных товаров ===
   const [selectedIds, setSelectedIds] = useState([]); 
     
@@ -54,52 +54,50 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   }, [user]);
 
   // === НОВОЕ: Авто-выбор товаров при загрузке ===
-  // Если список товаров изменился (загрузился), выбираем доступные, если список выбранных пуст
   useEffect(() => {
       if (items.length > 0) {
           setSelectedIds(prev => {
-              // Находим все доступные ID (есть в наличии)
               const availableIds = items
                   .filter(i => i.is_in_stock !== false)
                   .map(i => i.id);
 
-              // Если раньше ничего не было выбрано (первая загрузка), выбираем все доступные
               if (prev.length === 0) return availableIds;
 
-              // Если уже были выбраны, оставляем только те, что всё еще доступны и есть в списке items
-              // (чтобы убрать удаленные или те, что пропали из наличия)
               return prev.filter(id => availableIds.includes(id));
           });
       }
   }, [items]);
 
+  // 🔥 1. ЗАГРУЗКА КОРЗИНЫ ЧЕРЕЗ ВЕБХУК (ИСПРАВЛЕНО ПОД ТВОЙ JSON)
   const loadCart = async () => {
     setLoading(true);
     try {
-      // ЗАМЕНА SUPABASE НА ВЕБХУК
+      // Делаем запрос к твоему вебхуку
       const res = await fetch(`https://proshein.com/webhook/get-cart?user_id=${user?.id}`);
       
-      if (!res.ok) throw new Error('Network response was not ok');
+      if (!res.ok) throw new Error('Ошибка сети');
       
       const jsonResponse = await res.json();
       
-      // ВАЖНО: Извлекаем массив товаров из структуры JSON, которую ты прислал
-      // JSON приходит как [{ status: "success", items: [...] }]
-      const data = jsonResponse[0]?.items || [];
+      // ВАЖНО: Разбираем структуру [ { "items": [...] } ]
+      // Если пришел массив, берем первый элемент, иначе сам объект
+      const responseData = (Array.isArray(jsonResponse) && jsonResponse.length > 0) 
+                           ? jsonResponse[0] 
+                           : jsonResponse;
+                           
+      const cartItems = responseData.items || [];
 
-      // Превращаем данные в нужный формат
-      const formattedItems = data.map(i => ({ 
+      // Форматируем данные (как и было)
+      const formattedItems = cartItems.map(i => ({ 
           ...i, 
           quantity: Number(i.quantity) || 1,
           final_price_rub: Number(i.final_price_rub) || 0,
-          // Важно: пока база не обновится, берем старый статус
           is_in_stock: i.is_in_stock !== false 
       }));
 
       setItems(formattedItems);
 
-      // 2. ЗАПУСКАЕМ ФОНОВУЮ ПРОВЕРКУ (Fire and Forget)
-      // Мы не ждем await, чтобы интерфейс не тупил
+      // Запускаем фоновую проверку
       if (formattedItems.length > 0) {
           checkStockBackground(formattedItems);
       }
@@ -114,11 +112,10 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   // Новая функция фоновой проверки
   const checkStockBackground = async (currentItems) => {
       try {
-          // Берем только ID и ссылки (или shein_id), чтобы не гонять лишний трафик
           const itemsToCheck = currentItems.map(i => ({ 
-              id: i.id,            // ID записи в корзине (чтобы обновить UI)
-              product_url: i.product_url, // Ссылка для парсинга
-              shein_id: i.shein_id // ID товара Shein
+              id: i.id,            
+              product_url: i.product_url, 
+              shein_id: i.shein_id 
           }));
 
           const res = await fetch('https://proshein.com/webhook/check-cart-stock', {
@@ -129,7 +126,6 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
           const json = await res.json();
 
-          // Если пришли обновления, актуализируем стейт
           if (json.updated_items && json.updated_items.length > 0) {
               setItems(prev => prev.map(item => {
                   const update = json.updated_items.find(u => u.shein_id === item.shein_id);
@@ -137,7 +133,6 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
                       return { 
                           ...item, 
                           is_in_stock: update.is_in_stock 
-                          // Можно и цену обновить тут же, если изменилась
                       };
                   }
                   return item;
@@ -145,22 +140,26 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
           }
       } catch (e) {
           console.error("Ошибка фоновой проверки наличия:", e);
-          // Ошибку пользователю не показываем, пусть видит старые данные, чем ошибку
       }
   };
 
+  // 🔥 2. ЗАГРУЗКА АДРЕСОВ ЧЕРЕЗ ВЕБХУК
   const loadAddresses = async () => {
       try {
-          // ЗАМЕНА SUPABASE НА ВЕБХУК
           const res = await fetch(`https://proshein.com/webhook/get-addresses?user_id=${user?.id}`);
+          if (!res.ok) throw new Error('Network error');
           
-          if (!res.ok) throw new Error('Network response was not ok');
+          const jsonResponse = await res.json();
           
-          const data = await res.json();
-          // Для адресов предполагаем, что приходит просто массив или такая же структура
-          // Если адреса приходят в обертке, используйте data[0]?.items || []
-          // Но обычно простой get возвращает массив. Оставим data пока так.
-          setAddresses(data || []);
+          // Тот же принцип разбора JSON, если адреса приходят так же
+          const responseData = (Array.isArray(jsonResponse) && jsonResponse.length > 0) 
+                               ? jsonResponse[0] 
+                               : jsonResponse;
+
+          // Если в ответе поле addresses, берем его. Если сам ответ массив - берем его.
+          const addressesList = responseData.addresses || (Array.isArray(responseData) ? responseData : []);
+          
+          setAddresses(addressesList);
       } catch (e) { 
           console.error("Ошибка загрузки адресов:", e); 
       }
@@ -168,13 +167,12 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
   // --- ACTIONS ---
 
-  // === НОВОЕ: Переключение выбора товара ===
   const handleToggleSelect = (id) => {
       setSelectedIds(prev => {
           if (prev.includes(id)) {
-              return prev.filter(i => i !== id); // Убираем
+              return prev.filter(i => i !== id); 
           } else {
-              return [...prev, id]; // Добавляем
+              return [...prev, id]; 
           }
       });
   };
@@ -248,9 +246,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   const handleDeleteItem = async (e, id) => {
       if(!window.confirm('Удалить товар из корзины?')) return;
       
-      // Удаляем из списка товаров
       setItems(prev => prev.filter(i => i.id !== id));
-      // Удаляем из списка выбранных, если он там был
       setSelectedIds(prev => prev.filter(selId => selId !== id));
 
       try {
@@ -264,14 +260,12 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
   // --- CALCULATIONS ---
   
-  // === ВАЖНОЕ ИЗМЕНЕНИЕ: Считаем Subtotal ТОЛЬКО ДЛЯ ВЫБРАННЫХ ===
   const subtotal = useMemo(() => {
       return items
-          .filter(i => selectedIds.includes(i.id)) // Фильтр
+          .filter(i => selectedIds.includes(i.id))
           .reduce((sum, i) => sum + (i.final_price_rub * i.quantity), 0);
   }, [items, selectedIds]);
 
-  // Расчет лимитов для баллов
   const maxTotalDiscount = Math.floor(subtotal * MAX_TOTAL_DISCOUNT_PERCENT); 
   
   const availablePointsLimit = Math.max(0, Math.min(
@@ -325,9 +319,8 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   const pointsUsed = Math.min(parseInt(pointsInput) || 0, availablePointsLimit); 
   const finalTotal = Math.max(0, subtotal - couponDiscount - pointsUsed);
 
-  // --- РАСПРЕДЕЛЕНИЕ СКИДКИ (ТОЛЬКО НА ВЫБРАННЫЕ) ---
+  // --- РАСПРЕДЕЛЕНИЕ СКИДКИ ---
   const itemsForCheckout = useMemo(() => {
-      // 1. Берем только выбранные товары
       const selectedItems = items.filter(item => selectedIds.includes(item.id));
       
       const totalDiscountValue = couponDiscount + pointsUsed;
@@ -343,11 +336,8 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       
       return selectedItems.map((item, index) => {
           const itemTotalOriginal = item.final_price_rub * item.quantity;
-          
-          // Пропорциональная скидка по отношению к Subtotal (который тоже только от выбранных)
           let itemDiscount = Math.floor((itemTotalOriginal / subtotal) * totalDiscountValue);
           
-          // Корректировка копеек на последнем товаре
           if (index === selectedItems.length - 1) {
               itemDiscount = totalDiscountValue - distributedDiscount;
           } else {
@@ -367,20 +357,17 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
 
   const openCheckout = () => {
-      // 0. Проверка: выбрано ли что-то?
       if (selectedIds.length === 0) {
           window.Telegram?.WebApp?.showAlert('Выберите товары для оплаты!');
           return;
       }
 
-      // 1. Проверка размеров (только у выбранных)
       const selectedItems = items.filter(i => selectedIds.includes(i.id));
       if (selectedItems.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
           window.Telegram?.WebApp?.showAlert('Выберите размер для всех отмеченных товаров!');
           return;
       }
 
-      // 2. Проверка мин. суммы
       if (subtotal < MIN_ORDER_AMOUNT) {
           window.Telegram?.WebApp?.showAlert(`Минимальная сумма заказа: ${MIN_ORDER_AMOUNT.toLocaleString()} ₽`);
           return;
@@ -407,10 +394,8 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
                       <CartItem 
                         key={item.id} 
                         item={item}
-                        // Новые пропсы для выбора
                         isSelected={selectedIds.includes(item.id)}
                         onToggleSelect={handleToggleSelect}
-                        // Старые пропсы
                         onEdit={setEditingItem} 
                         onDelete={handleDeleteItem} 
                         onUpdateQuantity={handleUpdateQuantity} 
@@ -419,7 +404,6 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
               </div>
               <div className="h-px bg-white/5 my-4"></div>
               
-              {/* Если ничего не выбрано, скрываем блок оплаты или показываем нули */}
               {selectedIds.length > 0 ? (
                   <PaymentBlock 
                       subtotal={subtotal} 
@@ -462,9 +446,8 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
            onClose={(success) => { 
                setShowCheckout(false); 
                if(success) { 
-                   // Удаляем из корзины только те, что купили
                    setItems(prev => prev.filter(i => !selectedIds.includes(i.id)));
-                   setSelectedIds([]); // Сбрасываем выбор
+                   setSelectedIds([]); 
                    
                    if (onRefreshData) onRefreshData(); 
                    setActiveTab('home'); 
@@ -472,7 +455,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
            }}
            user={user} dbUser={dbUser}
            total={finalTotal} 
-           items={itemsForCheckout} // Передаем ТОЛЬКО ВЫБРАННЫЕ
+           items={itemsForCheckout} 
            pointsUsed={pointsUsed} 
            couponDiscount={couponDiscount} activeCoupon={activeCoupon}
            addresses={addresses} deliveryMethod={deliveryMethod} setDeliveryMethod={setDeliveryMethod}
