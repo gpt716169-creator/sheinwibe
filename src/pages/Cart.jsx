@@ -5,254 +5,143 @@ import FullScreenVideo from '../components/ui/FullScreenVideo';
 import EditItemModal from '../components/cart/EditItemModal';
 import CheckoutModal from '../components/cart/CheckoutModal';
 import CouponModal from '../components/cart/CouponModal';
-import { supabase } from '../supabaseClient';
 
 export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
-  // --- STATE: DATA ---
+  // --- STATE ---
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // === НОВОЕ: ID выбранных товаров ===
   const [selectedIds, setSelectedIds] = useState([]); 
-   
-  // --- STATE: ADDRESS & DELIVERY ---
   const [addresses, setAddresses] = useState([]);
+  
+  // --- DISCOUNTS & UI ---
   const [deliveryMethod, setDeliveryMethod] = useState('ПВЗ (5Post)');
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [selectedPvz, setSelectedPvz] = useState(null);
-
-  // --- STATE: DISCOUNTS ---
   const [pointsInput, setPointsInput] = useState('');
   const [activeCoupon, setActiveCoupon] = useState(null); 
   const [couponDiscount, setCouponDiscount] = useState(0);
-
-  // --- STATE: UI ---
   const [showCheckout, setShowCheckout] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [savingItem, setSavingItem] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
 
-  // CONSTANTS
   const VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/vkclips_20251219083418.mp4"; 
-  
-  // НАСТРОЙКИ ОГРАНИЧЕНИЙ
-  const MIN_ORDER_AMOUNT = 3000;       // Минимальная сумма заказа
-  const MAX_TOTAL_DISCOUNT_PERCENT = 0.50; // Максимальная общая скидка (Купон + Баллы) = 50%
-  
+  const MIN_ORDER_AMOUNT = 3000;
+  const MAX_TOTAL_DISCOUNT_PERCENT = 0.50;
   const userPointsBalance = dbUser?.points || 0;
 
-  // --- LOAD DATA ---
+  // --- INITIAL LOAD ---
   useEffect(() => {
     if (user?.id) { 
         loadCart(); 
         loadAddresses(); 
-    } else {
-        const t = setTimeout(() => setLoading(false), 2000);
-        return () => clearTimeout(t);
     }
   }, [user]);
 
-  // === НОВОЕ: Авто-выбор товаров при загрузке ===
-  // Если список товаров изменился (загрузился), выбираем доступные, если список выбранных пуст
+  // Авто-выбор доступных товаров при загрузке
   useEffect(() => {
-      if (items.length > 0) {
-          setSelectedIds(prev => {
-              // Находим все доступные ID (есть в наличии)
-              const availableIds = items
-                  .filter(i => i.is_in_stock !== false)
-                  .map(i => i.id);
-
-              // Если раньше ничего не было выбрано (первая загрузка), выбираем все доступные
-              if (prev.length === 0) return availableIds;
-
-              // Если уже были выбраны, оставляем только те, что всё еще доступны и есть в списке items
-              // (чтобы убрать удаленные или те, что пропали из наличия)
-              return prev.filter(id => availableIds.includes(id));
-          });
+      if (items.length > 0 && selectedIds.length === 0) {
+          const availableIds = items.filter(i => i.is_in_stock !== false).map(i => i.id);
+          setSelectedIds(availableIds);
       }
   }, [items]);
+
+  // --- API CALLS (WEBHOOKS) ---
 
   const loadCart = async () => {
     setLoading(true);
     try {
-      // 1. Прямой запрос в базу (Мгновенно)
-      // Предлагаю создать view (представление) в Supabase или делать join, 
-      // но для начала можно просто select, если у тебя cart_items хранит всю инфу.
-      // Если cart_items ссылается на products, нужен join.
+      // ✅ ПРОСТОЙ ЗАПРОС К ВЕБХУКУ
+      const res = await fetch(`https://proshein.com/webhook/get-cart?user_id=${user?.id}`);
+      if (!res.ok) throw new Error('Network error');
       
-      // Допустим, у тебя cart_items содержит копию данных (как в твоем старом вебхуке)
-      const { data, error } = await supabase
-          .from('cart_items') 
-          .select('*')
-          .eq('telegram_id', user?.id);
-
-      if (error) throw error;
-
-      // Превращаем данные в нужный формат
+      const data = await res.json();
+      
+      // Форматируем данные, чтобы они точно подошли фронтенду
       const formattedItems = (data || []).map(i => ({ 
           ...i, 
+          // Гарантируем, что числа это числа
           quantity: Number(i.quantity) || 1,
           final_price_rub: Number(i.final_price_rub) || 0,
-          // Важно: пока база не обновится, берем старый статус
           is_in_stock: i.is_in_stock !== false 
       }));
 
       setItems(formattedItems);
-
-      // 2. ЗАПУСКАЕМ ФОНОВУЮ ПРОВЕРКУ (Fire and Forget)
-      // Мы не ждем await, чтобы интерфейс не тупил
-      if (formattedItems.length > 0) {
-          checkStockBackground(formattedItems);
-      }
-
     } catch (e) { 
-        console.error("Ошибка загрузки корзины:", e); 
+        console.error("Cart load error:", e); 
     } finally { 
         setLoading(false); 
     }
   };
 
-  // Новая функция фоновой проверки
-  const checkStockBackground = async (currentItems) => {
-      try {
-          // Берем только ID и ссылки (или shein_id), чтобы не гонять лишний трафик
-          const itemsToCheck = currentItems.map(i => ({ 
-              id: i.id,           // ID записи в корзине (чтобы обновить UI)
-              product_url: i.product_url, // Ссылка для парсинга
-              shein_id: i.shein_id // ID товара Shein
-          }));
-
-          const res = await fetch('https://proshein.com/webhook/check-cart-stock', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ items: itemsToCheck })
-          });
-
-          const json = await res.json();
-
-          // Если пришли обновления, актуализируем стейт
-          if (json.updated_items && json.updated_items.length > 0) {
-              setItems(prev => prev.map(item => {
-                  const update = json.updated_items.find(u => u.shein_id === item.shein_id);
-                  if (update) {
-                      return { 
-                          ...item, 
-                          is_in_stock: update.is_in_stock 
-                          // Можно и цену обновить тут же, если изменилась
-                      };
-                  }
-                  return item;
-              }));
-          }
-      } catch (e) {
-          console.error("Ошибка фоновой проверки наличия:", e);
-          // Ошибку пользователю не показываем, пусть видит старые данные, чем ошибку
-      }
-  };
-
   const loadAddresses = async () => {
       try {
-          const { data, error } = await supabase
-              .from('user_addresses')
-              .select('*, pickup_point_id') 
-              .eq('user_id', user?.id)
-              .order('is_default', { ascending: false });
-
-          if (error) throw error;
-          setAddresses(data || []);
+          // ✅ ПРОСТОЙ ЗАПРОС К ВЕБХУКУ АДРЕСОВ
+          const res = await fetch(`https://proshein.com/webhook/get-addresses?user_id=${user?.id}`);
+          if (res.ok) {
+              const data = await res.json();
+              setAddresses(data || []);
+          }
       } catch (e) { 
-          console.error("Ошибка загрузки адресов:", e); 
+          console.error("Address load error:", e); 
       }
   };
 
   // --- ACTIONS ---
 
-  // === НОВОЕ: Переключение выбора товара ===
   const handleToggleSelect = (id) => {
-      setSelectedIds(prev => {
-          if (prev.includes(id)) {
-              return prev.filter(i => i !== id); // Убираем
-          } else {
-              return [...prev, id]; // Добавляем
-          }
-      });
-  };
-
-  const handleManageAddresses = () => {
-      sessionStorage.setItem('open_profile_tab', 'addresses');
-      setActiveTab('profile');
+      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   const handleUpdateQuantity = async (id, delta) => {
       const currentItem = items.find(i => i.id === id);
       if (!currentItem) return;
-
       const newQty = Math.max(1, currentItem.quantity + delta);
       if (newQty === currentItem.quantity) return;
 
       setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
 
+      // Обновляем через вебхук
       try {
           await fetch('https://proshein.com/webhook/update-cart-item', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
-                  id, 
-                  quantity: newQty,
-                  size: currentItem.size, 
-                  color: currentItem.color,
-                  tg_id: user?.id 
+                  id, quantity: newQty, size: currentItem.size, color: currentItem.color, tg_id: user?.id 
               })
           });
-      } catch (e) {
-          console.error("Ошибка сохранения количества:", e);
-      }
+      } catch (e) { console.error(e); }
   };
 
   const saveItemParams = async (id, newSize, newColor) => {
     setSavingItem(true);
-    const currentItem = items.find(i => i.id === id);
-    const quantity = currentItem ? currentItem.quantity : 1;
-    const colorToSave = newColor || (currentItem ? currentItem.color : '');
+    const item = items.find(i => i.id === id);
+    if (!item) return;
 
-    setItems(prev => prev.map(item => 
-      item.id === id 
-        ? { ...item, size: newSize, color: colorToSave } 
-        : item
-    ));
+    setItems(prev => prev.map(i => i.id === id ? { ...i, size: newSize, color: newColor || i.color } : i));
 
     try {
-      const res = await fetch('https://proshein.com/webhook/update-cart-item', {
+      await fetch('https://proshein.com/webhook/update-cart-item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          id: id,
-          tg_id: user?.id,
-          quantity: quantity,
-          size: newSize,
-          color: colorToSave
+          id, tg_id: user?.id, quantity: item.quantity, size: newSize, color: newColor || item.color
         })
       });
-      if (!res.ok) throw new Error('Failed to update');
-      window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
       setEditingItem(null); 
     } catch (e) {
-      console.error('Ошибка сохранения параметров:', e);
-      window.Telegram?.WebApp?.showAlert('Не удалось сохранить изменения');
+      console.error(e);
+      window.Telegram?.WebApp?.showAlert('Ошибка сохранения');
     } finally {
       setSavingItem(false);
     }
   };
-   
+    
   const handleDeleteItem = async (e, id) => {
-      if(!window.confirm('Удалить товар из корзины?')) return;
-      
-      // Удаляем из списка товаров
+      if(!window.confirm('Удалить?')) return;
       setItems(prev => prev.filter(i => i.id !== id));
-      // Удаляем из списка выбранных, если он там был
       setSelectedIds(prev => prev.filter(selId => selId !== id));
-
       try {
           await fetch('https://proshein.com/webhook/delete-item', { 
               method: 'POST', 
@@ -263,129 +152,62 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   };
 
   // --- CALCULATIONS ---
-  
-  // === ВАЖНОЕ ИЗМЕНЕНИЕ: Считаем Subtotal ТОЛЬКО ДЛЯ ВЫБРАННЫХ ===
   const subtotal = useMemo(() => {
       return items
-          .filter(i => selectedIds.includes(i.id)) // Фильтр
+          .filter(i => selectedIds.includes(i.id))
           .reduce((sum, i) => sum + (i.final_price_rub * i.quantity), 0);
   }, [items, selectedIds]);
 
-  // Расчет лимитов для баллов
   const maxTotalDiscount = Math.floor(subtotal * MAX_TOTAL_DISCOUNT_PERCENT); 
-  
-  const availablePointsLimit = Math.max(0, Math.min(
-      userPointsBalance,            
-      maxTotalDiscount - couponDiscount 
-  ));
+  const availablePointsLimit = Math.max(0, Math.min(userPointsBalance, maxTotalDiscount - couponDiscount));
 
   const handlePointsChange = (val) => {
       let num = parseInt(val) || 0;
       if (num < 0) num = 0;
-      
-      if (num > availablePointsLimit) {
-          num = availablePointsLimit;
-      }
+      if (num > availablePointsLimit) num = availablePointsLimit;
       setPointsInput(num > 0 ? num.toString() : '');
   };
 
-  // --- ЛОГИКА КУПОНОВ ---
   const applyCoupon = (coupon) => {
-      if (!coupon) {
-          setActiveCoupon(null);
-          setCouponDiscount(0);
-          return;
-      }
-
+      if (!coupon) { setActiveCoupon(null); setCouponDiscount(0); return; }
       if (subtotal < (coupon.min_order_amount || 0)) {
-          window.Telegram?.WebApp?.showAlert(`Мин. сумма заказа для этого купона: ${coupon.min_order_amount}₽`);
-          return;
+          window.Telegram?.WebApp?.showAlert(`Мин. сумма: ${coupon.min_order_amount}₽`); return;
       }
-
-      let discount = 0;
-      if (coupon.type === 'percent') {
-          discount = Math.floor(subtotal * (coupon.discount_amount / 100));
-      } else {
-          discount = Number(coupon.discount_amount);
-      }
-
+      let discount = coupon.type === 'percent' 
+          ? Math.floor(subtotal * (coupon.discount_amount / 100)) 
+          : Number(coupon.discount_amount);
       if (discount > maxTotalDiscount) discount = maxTotalDiscount;
 
       setCouponDiscount(discount);
       setActiveCoupon(coupon); 
-      
-      if ((parseInt(pointsInput) || 0) > (maxTotalDiscount - discount)) {
-          setPointsInput('');
-      }
-
+      if ((parseInt(pointsInput) || 0) > (maxTotalDiscount - discount)) setPointsInput('');
       setShowCouponModal(false);
-      window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
   };
 
   const pointsUsed = Math.min(parseInt(pointsInput) || 0, availablePointsLimit); 
   const finalTotal = Math.max(0, subtotal - couponDiscount - pointsUsed);
 
-  // --- РАСПРЕДЕЛЕНИЕ СКИДКИ (ТОЛЬКО НА ВЫБРАННЫЕ) ---
+  // Распределение скидки для чека
   const itemsForCheckout = useMemo(() => {
-      // 1. Берем только выбранные товары
       const selectedItems = items.filter(item => selectedIds.includes(item.id));
-      
       const totalDiscountValue = couponDiscount + pointsUsed;
-      
-      if (totalDiscountValue <= 0) {
-          return selectedItems.map(item => ({
-              ...item,
-              price_at_purchase: item.final_price_rub
-          }));
-      }
+      if (totalDiscountValue <= 0) return selectedItems.map(item => ({ ...item, price_at_purchase: item.final_price_rub }));
 
-      let distributedDiscount = 0;
-      
+      let distributed = 0;
       return selectedItems.map((item, index) => {
-          const itemTotalOriginal = item.final_price_rub * item.quantity;
+          const itemTotal = item.final_price_rub * item.quantity;
+          let discount = Math.floor((itemTotal / subtotal) * totalDiscountValue);
+          if (index === selectedItems.length - 1) discount = totalDiscountValue - distributed;
+          else distributed += discount;
           
-          // Пропорциональная скидка по отношению к Subtotal (который тоже только от выбранных)
-          let itemDiscount = Math.floor((itemTotalOriginal / subtotal) * totalDiscountValue);
-          
-          // Корректировка копеек на последнем товаре
-          if (index === selectedItems.length - 1) {
-              itemDiscount = totalDiscountValue - distributedDiscount;
-          } else {
-              distributedDiscount += itemDiscount;
-          }
-
-          const totalDiscountedPrice = itemTotalOriginal - itemDiscount;
-          const unitPrice = Math.floor(totalDiscountedPrice / item.quantity);
-
-          return {
-              ...item,
-              final_price_rub: unitPrice, 
-              price_at_purchase: unitPrice 
-          };
+          const unitPrice = Math.floor((itemTotal - discount) / item.quantity);
+          return { ...item, final_price_rub: unitPrice, price_at_purchase: unitPrice };
       });
   }, [items, selectedIds, subtotal, couponDiscount, pointsUsed]);
 
-
   const openCheckout = () => {
-      // 0. Проверка: выбрано ли что-то?
-      if (selectedIds.length === 0) {
-          window.Telegram?.WebApp?.showAlert('Выберите товары для оплаты!');
-          return;
-      }
-
-      // 1. Проверка размеров (только у выбранных)
-      const selectedItems = items.filter(i => selectedIds.includes(i.id));
-      if (selectedItems.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
-          window.Telegram?.WebApp?.showAlert('Выберите размер для всех отмеченных товаров!');
-          return;
-      }
-
-      // 2. Проверка мин. суммы
-      if (subtotal < MIN_ORDER_AMOUNT) {
-          window.Telegram?.WebApp?.showAlert(`Минимальная сумма заказа: ${MIN_ORDER_AMOUNT.toLocaleString()} ₽`);
-          return;
-      }
-
+      if (selectedIds.length === 0) return window.Telegram?.WebApp?.showAlert('Выберите товары!');
+      if (subtotal < MIN_ORDER_AMOUNT) return window.Telegram?.WebApp?.showAlert(`Мин. заказ: ${MIN_ORDER_AMOUNT} ₽`);
       setShowCheckout(true);
   };
 
@@ -405,12 +227,9 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
               <div className="space-y-3">
                   {items.map(item => (
                       <CartItem 
-                        key={item.id} 
-                        item={item}
-                        // Новые пропсы для выбора
+                        key={item.id} item={item}
                         isSelected={selectedIds.includes(item.id)}
                         onToggleSelect={handleToggleSelect}
-                        // Старые пропсы
                         onEdit={setEditingItem} 
                         onDelete={handleDeleteItem} 
                         onUpdateQuantity={handleUpdateQuantity} 
@@ -419,14 +238,10 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
               </div>
               <div className="h-px bg-white/5 my-4"></div>
               
-              {/* Если ничего не выбрано, скрываем блок оплаты или показываем нули */}
               {selectedIds.length > 0 ? (
                   <PaymentBlock 
-                      subtotal={subtotal} 
-                      total={finalTotal} 
-                      discount={couponDiscount}
-                      pointsInput={pointsInput} 
-                      setPointsInput={handlePointsChange}
+                      subtotal={subtotal} total={finalTotal} discount={couponDiscount}
+                      pointsInput={pointsInput} setPointsInput={handlePointsChange}
                       userPointsBalance={userPointsBalance} 
                       handleUseMaxPoints={() => handlePointsChange(availablePointsLimit)}
                       activeCouponCode={activeCoupon?.code}
@@ -436,52 +251,37 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
                   />
               ) : (
                   <div className="text-center text-white/40 py-4 text-sm bg-white/5 rounded-xl">
-                      Выберите товары для расчета стоимости
+                      Выберите товары для расчета
                   </div>
               )}
           </div>
       )}
 
-      {/* --- MODALS --- */}
       {editingItem && (
         <EditItemModal item={editingItem} onClose={() => setEditingItem(null)} onSave={saveItemParams} saving={savingItem} />
       )}
-
       {showCouponModal && (
-         <CouponModal 
-            userId={user?.id}
-            subtotal={subtotal}
-            onClose={() => setShowCouponModal(false)}
-            onApply={applyCoupon}
-            activeCouponCode={activeCoupon?.code}
-         />
+         <CouponModal userId={user?.id} subtotal={subtotal} onClose={() => setShowCouponModal(false)} onApply={applyCoupon} activeCouponCode={activeCoupon?.code} />
       )}
-
       {showCheckout && (
         <CheckoutModal 
            onClose={(success) => { 
                setShowCheckout(false); 
                if(success) { 
-                   // Удаляем из корзины только те, что купили
                    setItems(prev => prev.filter(i => !selectedIds.includes(i.id)));
-                   setSelectedIds([]); // Сбрасываем выбор
-                   
+                   setSelectedIds([]); 
                    if (onRefreshData) onRefreshData(); 
                    setActiveTab('home'); 
                } 
            }}
-           user={user} dbUser={dbUser}
-           total={finalTotal} 
-           items={itemsForCheckout} // Передаем ТОЛЬКО ВЫБРАННЫЕ
-           pointsUsed={pointsUsed} 
-           couponDiscount={couponDiscount} activeCoupon={activeCoupon}
+           user={user} dbUser={dbUser} total={finalTotal} items={itemsForCheckout} 
+           pointsUsed={pointsUsed} couponDiscount={couponDiscount} activeCoupon={activeCoupon}
            addresses={addresses} deliveryMethod={deliveryMethod} setDeliveryMethod={setDeliveryMethod}
            selectedAddress={selectedAddress} setSelectedAddress={setSelectedAddress}
            selectedPvz={selectedPvz} setSelectedPvz={setSelectedPvz}
-           onManageAddresses={handleManageAddresses} 
+           onManageAddresses={() => { sessionStorage.setItem('open_profile_tab', 'addresses'); setActiveTab('profile'); }} 
         />
       )}
-
       {videoOpen && <FullScreenVideo src={VIDEO_URL} onClose={() => setVideoOpen(false)} />}
     </div>
   );
