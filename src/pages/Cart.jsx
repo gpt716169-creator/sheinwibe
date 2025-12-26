@@ -5,7 +5,47 @@ import FullScreenVideo from '../components/ui/FullScreenVideo';
 import EditItemModal from '../components/cart/EditItemModal';
 import CheckoutModal from '../components/cart/CheckoutModal';
 import CouponModal from '../components/cart/CouponModal';
-// import { supabase } from '../supabaseClient'; // УБРАЛИ SUPABASE
+
+// --- КОМПОНЕНТ СНЕГА ---
+const SnowEffect = () => {
+  const snowflakes = useMemo(() => Array.from({ length: 30 }).map((_, i) => ({
+    id: i,
+    left: `${Math.random() * 100}%`,
+    animationDuration: `${Math.random() * 3 + 5}s`,
+    animationDelay: `${Math.random() * 5}s`,
+    opacity: Math.random() * 0.5 + 0.3,
+    size: Math.random() * 10 + 5
+  })), []);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <style>
+        {`
+          @keyframes snowfall {
+            0% { transform: translateY(-10px) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(360deg); }
+          }
+        `}
+        </style>
+        {snowflakes.map((flake) => (
+            <div
+                key={flake.id}
+                className="absolute text-white"
+                style={{
+                    left: flake.left,
+                    top: -20,
+                    fontSize: `${flake.size}px`,
+                    opacity: flake.opacity,
+                    animation: `snowfall ${flake.animationDuration} linear infinite`,
+                    animationDelay: flake.animationDelay,
+                }}
+            >
+                ❄
+            </div>
+        ))}
+    </div>
+  );
+};
 
 export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   // --- STATE: DATA ---
@@ -68,26 +108,22 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       }
   }, [items]);
 
-  // 🔥 1. ЗАГРУЗКА КОРЗИНЫ ЧЕРЕЗ ВЕБХУК (ИСПРАВЛЕНО ПОД ТВОЙ JSON)
+  // 🔥 1. ЗАГРУЗКА КОРЗИНЫ ЧЕРЕЗ ВЕБХУК
   const loadCart = async () => {
     setLoading(true);
     try {
-      // Делаем запрос к твоему вебхуку
       const res = await fetch(`https://proshein.com/webhook/get-cart?user_id=${user?.id}`);
       
       if (!res.ok) throw new Error('Ошибка сети');
       
       const jsonResponse = await res.json();
       
-      // ВАЖНО: Разбираем структуру [ { "items": [...] } ]
-      // Если пришел массив, берем первый элемент, иначе сам объект
       const responseData = (Array.isArray(jsonResponse) && jsonResponse.length > 0) 
                            ? jsonResponse[0] 
                            : jsonResponse;
                            
       const cartItems = responseData.items || [];
 
-      // Форматируем данные (как и было)
       const formattedItems = cartItems.map(i => ({ 
           ...i, 
           quantity: Number(i.quantity) || 1,
@@ -97,7 +133,6 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
       setItems(formattedItems);
 
-      // Запускаем фоновую проверку
       if (formattedItems.length > 0) {
           checkStockBackground(formattedItems);
       }
@@ -151,12 +186,10 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
           
           const jsonResponse = await res.json();
           
-          // Тот же принцип разбора JSON, если адреса приходят так же
           const responseData = (Array.isArray(jsonResponse) && jsonResponse.length > 0) 
                                ? jsonResponse[0] 
                                : jsonResponse;
 
-          // Если в ответе поле addresses, берем его. Если сам ответ массив - берем его.
           const addressesList = responseData.addresses || (Array.isArray(responseData) ? responseData : []);
           
           setAddresses(addressesList);
@@ -377,54 +410,68 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-transparent animate-fade-in pb-32">
-      <div className="p-6 pt-8 pb-4"><h1 className="text-white text-lg font-medium">Корзина ({items.length})</h1></div>
+    <div className="flex flex-col min-h-screen bg-transparent animate-fade-in pb-32 relative">
+      
+      {/* --- ФОНОВЫЕ ЭФФЕКТЫ --- */}
+      <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-red-600/30 to-transparent pointer-events-none z-0" />
+      <SnowEffect />
 
-      {loading ? (
-          <div className="text-center text-white/50 mt-10">Загрузка...</div>
-      ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center mt-10 opacity-50">
-             <span className="material-symbols-outlined text-4xl mb-2">shopping_basket</span>
-             <p className="text-sm">Корзина пуста</p>
-          </div>
-      ) : (
-          <div className="px-6 space-y-4">
-              <div className="space-y-3">
-                  {items.map(item => (
-                      <CartItem 
-                        key={item.id} 
-                        item={item}
-                        isSelected={selectedIds.includes(item.id)}
-                        onToggleSelect={handleToggleSelect}
-                        onEdit={setEditingItem} 
-                        onDelete={handleDeleteItem} 
-                        onUpdateQuantity={handleUpdateQuantity} 
-                      />
-                  ))}
+      {/* HEADER (z-10 для кликабельности) */}
+      <div className="p-6 pt-8 pb-4 relative z-10 flex items-center justify-between">
+          <h1 className="text-white text-lg font-medium flex items-center gap-2">
+            Мои подарки 🛒 
+            <span className="text-white/50 text-sm font-normal">({items.length})</span>
+          </h1>
+      </div>
+
+      <div className="relative z-10 flex flex-col flex-1">
+          {loading ? (
+              <div className="text-center text-white/50 mt-10">Загружаем список желаний... ❄️</div>
+          ) : items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center mt-10 opacity-50">
+                 <span className="material-symbols-outlined text-4xl mb-2 text-white/40">card_giftcard</span>
+                 <p className="text-sm text-white/60">Пока что без подарков...</p>
+                 <p className="text-xs text-white/40 mt-1">Самое время что-то выбрать!</p>
               </div>
-              <div className="h-px bg-white/5 my-4"></div>
-              
-              {selectedIds.length > 0 ? (
-                  <PaymentBlock 
-                      subtotal={subtotal} 
-                      total={finalTotal} 
-                      discount={couponDiscount}
-                      pointsInput={pointsInput} 
-                      setPointsInput={handlePointsChange}
-                      userPointsBalance={userPointsBalance} 
-                      handleUseMaxPoints={() => handlePointsChange(availablePointsLimit)}
-                      activeCouponCode={activeCoupon?.code}
-                      onOpenCoupons={() => setShowCouponModal(true)}
-                      onPay={openCheckout} 
-                      onPlayVideo={() => setVideoOpen(true)} 
-                  />
-              ) : (
-                  <div className="text-center text-white/40 py-4 text-sm bg-white/5 rounded-xl">
-                      Выберите товары для расчета стоимости
+          ) : (
+              <div className="px-6 space-y-4">
+                  <div className="space-y-3">
+                      {items.map(item => (
+                          <CartItem 
+                            key={item.id} 
+                            item={item}
+                            isSelected={selectedIds.includes(item.id)}
+                            onToggleSelect={handleToggleSelect}
+                            onEdit={setEditingItem} 
+                            onDelete={handleDeleteItem} 
+                            onUpdateQuantity={handleUpdateQuantity} 
+                          />
+                      ))}
                   </div>
-              )}
-          </div>
-      )}
+                  <div className="h-px bg-white/5 my-4"></div>
+                  
+                  {selectedIds.length > 0 ? (
+                      <PaymentBlock 
+                          subtotal={subtotal} 
+                          total={finalTotal} 
+                          discount={couponDiscount}
+                          pointsInput={pointsInput} 
+                          setPointsInput={handlePointsChange}
+                          userPointsBalance={userPointsBalance} 
+                          handleUseMaxPoints={() => handlePointsChange(availablePointsLimit)}
+                          activeCouponCode={activeCoupon?.code}
+                          onOpenCoupons={() => setShowCouponModal(true)}
+                          onPay={openCheckout} 
+                          onPlayVideo={() => setVideoOpen(true)} 
+                      />
+                  ) : (
+                      <div className="text-center text-white/40 py-4 text-sm bg-white/5 rounded-xl backdrop-blur-sm border border-white/5">
+                          Выберите товары, чтобы рассчитать стоимость подарка 🎁
+                      </div>
+                  )}
+              </div>
+          )}
+      </div>
 
       {/* --- MODALS --- */}
       {editingItem && (
