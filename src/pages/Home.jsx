@@ -162,7 +162,7 @@ export default function Home({ user, dbUser, setActiveTab }) {
             <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3 ml-1 opacity-60">
                     <h3 className="text-white font-bold text-sm uppercase tracking-wider">Мой уровень</h3>
-                    <span className="text-xs text-yellow-300">❄️ Winter Sale</span>
+                    <span className="text-xs text-yellow-300">❄️ Хорошего настроения</span>
                 </div>
                 <LoyaltyCard 
                     points={parseInt(dbUser?.points) || 0} 
