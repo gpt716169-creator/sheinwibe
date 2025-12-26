@@ -82,7 +82,7 @@ export default function Home({ user, dbUser, setActiveTab }) {
   const handleSearch = async (link) => {
       window.Telegram?.WebApp?.MainButton.showProgress();
       try {
-          const res = await fetch('https://proshein.com/webhook-test/parse-shein', {
+          const res = await fetch('https://proshein.com/webhook/parse-shein', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ link, tg_id: user?.id })
