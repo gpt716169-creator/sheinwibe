@@ -6,7 +6,7 @@ import EditItemModal from '../components/cart/EditItemModal';
 import CheckoutModal from '../components/cart/CheckoutModal';
 import CouponModal from '../components/cart/CouponModal';
 
-// --- КОМПОНЕНТ СНЕГА ---
+// --- КОМПОНЕНТ СНЕГА (Оставляем для красоты) ---
 const SnowEffect = () => {
   const snowflakes = useMemo(() => Array.from({ length: 30 }).map((_, i) => ({
     id: i,
@@ -52,7 +52,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
    
-  // === НОВОЕ: ID выбранных товаров ===
+  // ID выбранных товаров
   const [selectedIds, setSelectedIds] = useState([]); 
     
   // --- STATE: ADDRESS & DELIVERY ---
@@ -76,9 +76,9 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   // CONSTANTS
   const VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/vkclips_20251219083418.mp4"; 
   
-  // НАСТРОЙКИ ОГРАНИЧЕНИЙ
-  const MIN_ORDER_AMOUNT = 3000;       // Минимальная сумма заказа
-  const MAX_TOTAL_DISCOUNT_PERCENT = 0.50; // Максимальная общая скидка (Купон + Баллы) = 50%
+  // НАСТРОЙКИ
+  const MIN_ORDER_AMOUNT = 3000;       
+  const MAX_TOTAL_DISCOUNT_PERCENT = 0.50; 
   
   const userPointsBalance = dbUser?.points || 0;
 
@@ -93,7 +93,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
     }
   }, [user]);
 
-  // === НОВОЕ: Авто-выбор товаров при загрузке ===
+  // Авто-выбор товаров при загрузке (только тех, что в наличии)
   useEffect(() => {
       if (items.length > 0) {
           setSelectedIds(prev => {
@@ -102,13 +102,12 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
                   .map(i => i.id);
 
               if (prev.length === 0) return availableIds;
-
               return prev.filter(id => availableIds.includes(id));
           });
       }
   }, [items]);
 
-  // 🔥 1. ЗАГРУЗКА КОРЗИНЫ ЧЕРЕЗ ВЕБХУК
+  // 🔥 1. ЗАГРУЗКА КОРЗИНЫ
   const loadCart = async () => {
     setLoading(true);
     try {
@@ -128,11 +127,14 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
           ...i, 
           quantity: Number(i.quantity) || 1,
           final_price_rub: Number(i.final_price_rub) || 0,
-          is_in_stock: i.is_in_stock !== false 
+          // СУПЕР-ВАЖНО: Приводим всё к единому флагу is_in_stock
+          // Если есть is_available (от парсера) берем его, если нет - берем is_in_stock
+          is_in_stock: (i.is_available !== undefined ? i.is_available : i.is_in_stock) !== false 
       }));
 
       setItems(formattedItems);
 
+      // Запускаем тихую проверку цен и наличия
       if (formattedItems.length > 0) {
           checkStockBackground(formattedItems);
       }
@@ -144,11 +146,11 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
     }
   };
 
-  // Новая функция фоновой проверки
+  // 🔥 2. ФОНОВАЯ ПРОВЕРКА (ИСПРАВЛЕННАЯ)
   const checkStockBackground = async (currentItems) => {
       try {
           const itemsToCheck = currentItems.map(i => ({ 
-              id: i.id,            
+              id: i.id,             
               product_url: i.product_url, 
               shein_id: i.shein_id 
           }));
@@ -161,13 +163,20 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
 
           const json = await res.json();
 
+          // Если пришли обновления
           if (json.updated_items && json.updated_items.length > 0) {
-              setItems(prev => prev.map(item => {
+              setItems(prevItems => prevItems.map(item => {
+                  // Ищем, есть ли обновление для этого товара
                   const update = json.updated_items.find(u => u.shein_id === item.shein_id);
+                  
                   if (update) {
                       return { 
                           ...item, 
-                          is_in_stock: update.is_in_stock 
+                          // 1. Обновляем статус (берем is_available от бэка и кладем в is_in_stock)
+                          is_in_stock: update.is_available, 
+                          
+                          // 2. Обновляем цену (если вдруг подешевело/подорожало)
+                          final_price_rub: update.final_price_rub || item.final_price_rub
                       };
                   }
                   return item;
@@ -178,7 +187,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       }
   };
 
-  // 🔥 2. ЗАГРУЗКА АДРЕСОВ ЧЕРЕЗ ВЕБХУК
+  // 🔥 3. ЗАГРУЗКА АДРЕСОВ
   const loadAddresses = async () => {
       try {
           const res = await fetch(`https://proshein.com/webhook/get-addresses?user_id=${user?.id}`);
@@ -302,7 +311,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
   const maxTotalDiscount = Math.floor(subtotal * MAX_TOTAL_DISCOUNT_PERCENT); 
   
   const availablePointsLimit = Math.max(0, Math.min(
-      userPointsBalance,             
+      userPointsBalance,              
       maxTotalDiscount - couponDiscount 
   ));
 
@@ -396,9 +405,16 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       }
 
       const selectedItems = items.filter(i => selectedIds.includes(i.id));
+      // Проверка размера
       if (selectedItems.some(i => i.size === 'NOT_SELECTED' || !i.size)) {
           window.Telegram?.WebApp?.showAlert('Выберите размер для всех отмеченных товаров!');
           return;
+      }
+      
+      // Проверка наличия (на всякий случай)
+      if (selectedItems.some(i => !i.is_in_stock)) {
+           window.Telegram?.WebApp?.showAlert('Некоторые товары закончились. Удалите их из выбора.');
+           return;
       }
 
       if (subtotal < MIN_ORDER_AMOUNT) {
@@ -416,7 +432,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
       <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-red-600/30 to-transparent pointer-events-none z-0" />
       <SnowEffect />
 
-      {/* HEADER (z-10 для кликабельности) */}
+      {/* HEADER */}
       <div className="p-6 pt-8 pb-4 relative z-10 flex items-center justify-between">
           <h1 className="text-white text-lg font-medium flex items-center gap-2">
             Мои подарки 🛒 
@@ -440,6 +456,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
                           <CartItem 
                             key={item.id} 
                             item={item}
+                            // Важно: CartItem теперь получит актуальное состояние is_in_stock
                             isSelected={selectedIds.includes(item.id)}
                             onToggleSelect={handleToggleSelect}
                             onEdit={setEditingItem} 
