@@ -6,9 +6,8 @@ import LoyaltyModal from '../components/home/LoyaltyModal';
 import FullScreenVideo from '../components/ui/FullScreenVideo';
 import ReviewsBanner from '../components/home/ReviewsBanner';
 
-// --- КОМПОНЕНТ СНЕГА (Внутренний) ---
+// --- КОМПОНЕНТ СНЕГА ---
 const SnowEffect = () => {
-  // Создаем массив снежинок один раз, чтобы не перерендеривать
   const snowflakes = useMemo(() => Array.from({ length: 30 }).map((_, i) => ({
     id: i,
     left: `${Math.random() * 100}%`,
@@ -51,16 +50,13 @@ const SnowEffect = () => {
 export default function Home({ user, dbUser, setActiveTab }) {
   const [activeOrders, setActiveOrders] = useState([]);
   const [isLoyaltyModalOpen, setIsLoyaltyModalOpen] = useState(false);
-   
-  // Состояние для видео-инструкции
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
+  // === НОВОЕ СОСТОЯНИЕ: БЛОКИРОВКА ПОИСКА ===
+  const [isSearchLocked, setIsSearchLocked] = useState(false);
+
   const TUTORIAL_VIDEO_URL = "https://storage.yandexcloud.net/videosheinwibe/202512261655%20(1).mp4";
-   
-  // Ссылки
   const VPN_LINK = "https://t.me/hitvpnbot?start=187358585644246";
-  
-  // Новая ссылка-джампер (Deep Link)
   const SHEIN_LINK = "https://api-shein.shein.com/h5/sharejump/appjump?lan=ru&country=RU"; 
 
   // --- ЭФФЕКТЫ ---
@@ -80,6 +76,21 @@ export default function Home({ user, dbUser, setActiveTab }) {
   };
 
   const handleSearch = async (link) => {
+      // 1. ПРОВЕРКА БЛОКИРОВКИ
+      if (isSearchLocked) {
+          window.Telegram?.WebApp?.showAlert('Пожалуйста, подождите 10 секунд перед следующим поиском ⏳');
+          return; // Прерываем функцию, запрос не идет
+      }
+
+      // 2. СТАВИМ БЛОКИРОВКУ
+      setIsSearchLocked(true);
+      
+      // Таймер разблокировки через 10 секунд
+      setTimeout(() => {
+          setIsSearchLocked(false);
+      }, 10000);
+
+      // 3. ОСНОВНАЯ ЛОГИКА
       window.Telegram?.WebApp?.MainButton.showProgress();
       try {
           const res = await fetch('https://proshein.com/webhook/parse-shein', {
@@ -91,7 +102,7 @@ export default function Home({ user, dbUser, setActiveTab }) {
            
           if (json.status === 'success') {
               window.Telegram?.WebApp?.HapticFeedback.notificationOccurred('success');
-              window.Telegram?.WebApp?.showAlert('Товар добавлен в корзину! 🎁'); // Добавил подарок
+              window.Telegram?.WebApp?.showAlert('Товар добавлен в корзину! 🎁');
           } else {
               window.Telegram?.WebApp?.showAlert('Ошибка: Не удалось найти товар');
           }
@@ -99,6 +110,7 @@ export default function Home({ user, dbUser, setActiveTab }) {
           window.Telegram?.WebApp?.showAlert('Ошибка сети');
       } finally {
           window.Telegram?.WebApp?.MainButton.hideProgress();
+          // Примечание: isSearchLocked мы тут НЕ снимаем, он снимется сам по таймеру через 10 сек
       }
   };
 
@@ -118,15 +130,13 @@ export default function Home({ user, dbUser, setActiveTab }) {
   return (
     <div className="flex flex-col min-h-screen bg-transparent animate-fade-in pb-28 overflow-y-auto relative">
        
-        {/* --- НОВОГОДНИЙ ФОН И ЭФФЕКТЫ --- */}
-        {/* Красный градиент сверху для праздничной атмосферы */}
+        {/* ФОН */}
         <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-red-600/30 to-transparent pointer-events-none z-0" />
         <SnowEffect />
 
         {/* HEADER */}
         <div className="pt-8 px-6 pb-6 flex items-center justify-between relative z-10">
             <div>
-                {/* Праздничное приветствие */}
                 <h1 className="text-white text-2xl font-bold flex items-center gap-2">
                     С Новым Годом! 🎄
                 </h1>
@@ -139,14 +149,12 @@ export default function Home({ user, dbUser, setActiveTab }) {
                 onClick={() => setActiveTab('profile')} 
                 className="relative w-10 h-10 cursor-pointer"
             >
-                {/* Аватарка */}
                 <div 
                     className="w-full h-full rounded-full bg-white/10 border border-white/20 bg-cover bg-center overflow-hidden" 
                     style={{backgroundImage: user?.photo_url ? `url('${user.photo_url}')` : 'none'}}
                 >
                      {!user?.photo_url && <span className="material-symbols-outlined text-white/50 w-full h-full flex items-center justify-center">person</span>}
                 </div>
-                {/* Шапочка Санты на аватарке */}
                 <div className="absolute -top-3 -right-2 text-2xl filter drop-shadow-lg transform -rotate-12">
                     🎅
                 </div>
@@ -155,8 +163,11 @@ export default function Home({ user, dbUser, setActiveTab }) {
 
         <div className="px-6 space-y-8 relative z-10">
             
-            {/* 1. ПОИСК */}
-            <LinkSearch onSearch={handleSearch} />
+            {/* 1. ПОИСК (Передаем состояние блокировки) */}
+            <LinkSearch 
+                onSearch={handleSearch} 
+                isLocked={isSearchLocked} // <-- Можно использовать внутри LinkSearch чтобы задизейблить кнопку визуально
+            />
 
             {/* 2. КАРТА ЛОЯЛЬНОСТИ */}
             <div className="relative z-10">
@@ -179,11 +190,8 @@ export default function Home({ user, dbUser, setActiveTab }) {
 
             {/* 4. БЛОК ССЫЛОК */}
             <div className="space-y-3">
-                
-                {/* Отзывы */}
                 <ReviewsBanner />
 
-                {/* Видео */}
                 <div 
                     onClick={() => setIsTutorialOpen(true)} 
                     className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors active:scale-[0.98] backdrop-blur-sm"
@@ -199,17 +207,12 @@ export default function Home({ user, dbUser, setActiveTab }) {
                     <span className="material-symbols-outlined text-white/20">chevron_right</span>
                 </div>
 
-                {/* --- КНОПКА: SHEIN APP --- */}
                 <div 
                     onClick={openShein} 
                     className="bg-black/60 border border-white/10 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-black/80 transition-colors active:scale-[0.98] backdrop-blur-sm relative overflow-hidden"
                 >
-                    {/* Легкий золотистый блик для кнопки */}
                     <div className="absolute -right-4 -top-4 w-16 h-16 bg-yellow-500/20 blur-xl rounded-full"></div>
-
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-black font-extrabold text-lg shrink-0 z-10">
-                        S
-                    </div>
+                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-black font-extrabold text-lg shrink-0 z-10">S</div>
                     <div className="flex-1 z-10">
                         <h4 className="text-white font-bold text-sm">Выбрать подарки в SHEIN</h4>
                         <p className="text-white/40 text-xs">Перейти в приложение</p>
@@ -217,7 +220,6 @@ export default function Home({ user, dbUser, setActiveTab }) {
                     <span className="material-symbols-outlined text-white/20 z-10">open_in_new</span>
                 </div>
 
-                {/* VPN */}
                 <div 
                     onClick={openVpn} 
                     className="bg-[#1e2a4a]/60 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-[#1e2a4a]/80 transition-colors active:scale-[0.98] backdrop-blur-sm"
@@ -232,10 +234,8 @@ export default function Home({ user, dbUser, setActiveTab }) {
                     <span className="material-symbols-outlined text-white/20">open_in_new</span>
                 </div>
             </div>
-
         </div>
 
-        {/* --- МОДАЛКИ --- */}
         {isLoyaltyModalOpen && (
             <LoyaltyModal 
                 totalSpent={dbUser?.total_spent || 0} 
