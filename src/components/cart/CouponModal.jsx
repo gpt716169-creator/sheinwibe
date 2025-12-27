@@ -35,21 +35,52 @@ export default function CouponModal({ userId, subtotal, onClose, onApply, active
         }
     };
 
-    const handleManualSubmit = () => {
+    const handleManualSubmit = async () => {
         if (!manualCode) return;
         setChecking(true);
         
         const codeUpper = manualCode.toUpperCase().trim();
-        const found = coupons.find(c => c.code === codeUpper);
         
-        if (found) {
-            onApply(found);
+        // 1. Сначала ищем в уже загруженных (публичных) купонах
+        const localFound = coupons.find(c => c.code === codeUpper);
+        
+        if (localFound) {
+            onApply(localFound);
             setChecking(false);
             return;
         }
 
-        window.Telegram?.WebApp?.showAlert('Купон не найден или недоступен');
-        setChecking(false);
+        // 2. Если локально нет — проверяем на сервере (для СКРЫТЫХ купонов)
+        try {
+            // Тебе нужно будет настроить этот путь в n8n (или добавить логику в существующий вебхук)
+            // Мы передаем tg_id и сам код
+            const tgId = userId;
+            const res = await fetch(`https://proshein.com/webhook/check-coupon?tg_id=${tgId}&code=${codeUpper}`, {
+                method: 'GET', // Или POST, как тебе удобнее
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const json = await res.json();
+
+            // Представим, что n8n возвращает { status: 'success', coupon: { ... } }
+            if (json.status === 'success' && json.coupon) {
+                // Важно: проверяем условия на фронте или доверяем беку. 
+                // Лучше, чтобы бек сразу проверял subtotal >= min_order_amount
+                if (subtotal >= (json.coupon.min_order_amount || 0)) {
+                    onApply(json.coupon);
+                    window.Telegram?.WebApp?.showAlert('Секретный промокод применен! 🕵️‍♂️');
+                } else {
+                    window.Telegram?.WebApp?.showAlert(`Сумма заказа должна быть от ${json.coupon.min_order_amount}₽`);
+                }
+            } else {
+                window.Telegram?.WebApp?.showAlert('Купон не найден или истёк');
+            }
+        } catch (e) {
+            console.error("Ошибка проверки купона:", e);
+            window.Telegram?.WebApp?.showAlert('Ошибка сети при проверке купона');
+        } finally {
+            setChecking(false);
+        }
     };
 
     // --- 3. Оборачиваем всё в createPortal(..., document.body) ---
