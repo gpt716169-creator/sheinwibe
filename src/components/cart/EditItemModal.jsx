@@ -1,66 +1,94 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-// --- 1. КАРТА ЦВЕТОВ SHEIN ---
-// Переводим названия в HEX. Можно дополнять по мере необходимости.
+// --- 1. КАРТА ЦВЕТОВ (РАСШИРЕННАЯ) ---
+// Все ключи пишем в нижнем регистре!
 const SHEIN_COLOR_MAP = {
-  // Базовые сложные
+  // Красные / Розовые
   'burgundy': '#800020',
   'wine': '#722F37',
+  'red': '#FF0000',
+  'rose': '#FF007F',
+  'fuchsia': '#FF00FF',
+  'coral': '#FF7F50',
+  'pink': '#FFC0CB',
+  'hot pink': '#FF69B4',
+  
+  // Синие / Голубые
   'navy': '#000080',
   'navy blue': '#000080',
-  'khaki': '#F0E68C', // Или более модный #C3B091
+  'blue': '#0000FF',
+  'royal blue': '#4169E1',
+  'baby blue': '#89CFF0',
+  'teal': '#008080',
+  'cyan': '#00FFFF',
+  'sky blue': '#87CEEB',
+
+  // Зеленые
+  'green': '#008000',
+  'lime': '#00FF00',
+  'olive': '#808000',
+  'mint': '#98FF98',
+  'army green': '#4B5320',
+  'khaki': '#F0E68C',
+
+  // Коричневые / Бежевые
+  'brown': '#A52A2A',
+  'coffee': '#6F4E37',
   'camel': '#C19A6B',
   'beige': '#F5F5DC',
   'cream': '#FFFDD0',
   'apricot': '#FDD5B1',
-  'coffee': '#6F4E37',
-  'brown': '#A52A2A',
-  
-  // Пастельные и яркие
-  'mint': '#98FF98',
-  'coral': '#FF7F50',
+  'tan': '#D2B48C',
+
+  // Желтые / Оранжевые
+  'yellow': '#FFFF00',
   'mustard': '#FFDB58',
-  'olive': '#808000',
-  'teal': '#008080',
-  'mauve': '#E0B0FF',
-  'lilac': '#C8A2C8',
-  'rust': '#B7410E',
-  'fuchsia': '#FF00FF',
-  'rose': '#FF007F',
-  'baby blue': '#89CFF0',
-  'royal blue': '#4169E1',
-  
-  // Металлы
   'gold': '#FFD700',
+  'orange': '#FFA500',
+  'rust': '#B7410E',
+
+  // Фиолетовые
+  'purple': '#800080',
+  'violet': '#EE82EE',
+  'lilac': '#C8A2C8',
+  'mauve': '#E0B0FF',
+
+  // Монохром / Металл
+  'black': '#000000',
+  'white': '#FFFFFF',
+  'grey': '#808080',
+  'gray': '#808080',
   'silver': '#C0C0C0',
   'bronze': '#CD7F32',
   'champagne': '#F7E7CE',
 };
 
-// Хелпер для определения стиля фона
-const getColorStyle = (colorName) => {
-  if (!colorName) return { backgroundColor: 'transparent' };
+// Хелпер
+const getColorStyle = (rawColor) => {
+  if (!rawColor) return { backgroundColor: '#333' }; // Если цвета нет — темно-серый
   
-  const normalized = colorName.toLowerCase().trim();
+  // Нормализация: убираем пробелы по краям, приводим к нижнему регистру
+  const key = rawColor.toString().toLowerCase().trim();
 
-  // 1. Особая обработка для "Multicolor" (Разноцветный)
-  if (normalized === 'multicolor' || normalized === 'multi') {
+  // 1. Мультиколор
+  if (key.includes('multi') || key.includes('mix')) {
     return { background: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)' };
   }
 
-  // 2. Если есть в нашей карте - берем оттуда
-  if (SHEIN_COLOR_MAP[normalized]) {
-    return { backgroundColor: SHEIN_COLOR_MAP[normalized] };
+  // 2. Поиск в карте
+  if (SHEIN_COLOR_MAP[key]) {
+    return { backgroundColor: SHEIN_COLOR_MAP[key] };
   }
 
-  // 3. Если цвет "White" - делаем чисто белым (можно добавить border в компоненте)
-  if (normalized === 'white') {
-    return { backgroundColor: '#ffffff' };
+  // 3. Если цвет "White"
+  if (key === 'white') {
+    return { backgroundColor: '#ffffff', border: '1px solid #ccc' };
   }
 
-  // 4. Иначе пробуем использовать то, что пришло (для стандартных red, blue, hex-кодов)
-  return { backgroundColor: colorName };
+  // 4. Пробуем использовать как есть (вдруг это валидный цвет типа 'red')
+  // Если браузер не поймет цвет, он оставит прозрачный, поэтому добавим серый фолбек
+  return { backgroundColor: rawColor };
 };
 
 export default function EditItemModal({ item, onClose, onSave, saving }) {
@@ -137,19 +165,23 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           {/* Цвет */}
           {item.color && (
              <div>
-                <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold mb-3">
-                    Цвет: <span className="text-white normal-case">{item.color}</span>
-                </h4>
+                <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold">Цвет</h4>
+                    {/* 👇 ДЕБАГ: Выводим название цвета текстом, чтобы проверить, что приходит */}
+                    <span className="text-white/70 text-[10px] bg-white/10 px-2 py-0.5 rounded">
+                        Пришло: {item.color}
+                    </span>
+                </div>
+
                 <div 
                   onClick={() => setTempColor(item.color)}
                   className={`w-12 h-12 rounded-full border-2 flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${tempColor === item.color ? 'border-primary shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'border-white/10'}`} 
-                  // --- ВОТ ЗДЕСЬ МЫ ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ ---
+                  // Применяем стиль
                   style={getColorStyle(item.color)}
                 >
-                  {/* Меняем цвет галочки для темных/светлых фонов */}
                   {tempColor === item.color && (
                     <span className={`material-symbols-outlined text-lg font-bold drop-shadow-md ${
-                        ['white', 'beige', 'cream', 'apricot', 'silver', 'yellow'].includes(item.color.toLowerCase()) 
+                        ['white', 'beige', 'cream', 'apricot', 'silver', 'yellow'].includes((item.color || '').toLowerCase()) 
                         ? 'text-black' 
                         : 'text-white'
                     }`}>
