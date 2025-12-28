@@ -1,51 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-
-// 1. КАРТА (Дублируем для надежности)
-const COLOR_MAP = {
-  'multi': 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)',
-  'multicolor': 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)',
-  'burgundy': '#800020', 'wine': '#722F37', 'maroon': '#800000',
-  'navy': '#000080', 'royal': '#4169E1', 'teal': '#008080',
-  'khaki': '#F0E68C', 'camel': '#C19A6B', 'beige': '#F5F5DC', 'cream': '#FFFDD0',
-  'coffee': '#6F4E37', 'brown': '#A52A2A', 'apricot': '#FDD5B1',
-  'gold': '#FFD700', 'silver': '#C0C0C0', 'white': '#FFFFFF', 'black': '#000000',
-  'mustard': '#FFDB58', 'olive': '#808000', 'mint': '#98FF98',
-  'lilac': '#C8A2C8', 'mauve': '#E0B0FF', 'purple': '#800080',
-  'rose': '#FF007F', 'fuchsia': '#FF00FF', 'pink': '#FFC0CB',
-  'grey': '#808080', 'charcoal': '#36454F'
-};
-
-// 2. ГЕНЕРАТОР
-const stringToColor = (str) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  let color = '#';
-  for (let i = 0; i < 3; i++) {
-    let value = (hash >> (i * 8)) & 0xFF;
-    color += ('00' + value.toString(16)).substr(-2);
-  }
-  return color;
-};
-
-// 3. ФУНКЦИЯ СТИЛЯ
-const getColorStyle = (rawColor) => {
-  if (!rawColor) return { backgroundColor: '#333' };
-  const input = String(rawColor).toLowerCase().trim();
-  
-  if (input.startsWith('#')) return { backgroundColor: input };
-
-  const keys = Object.keys(COLOR_MAP).sort((a, b) => b.length - a.length);
-  for (const key of keys) {
-    if (input.includes(key)) {
-       const val = COLOR_MAP[key];
-       return key.includes('multi') ? { background: val } : { backgroundColor: val };
-    }
-  }
-  return { backgroundColor: stringToColor(input) };
-};
+import { getColorStyle } from '../../utils/colorUtils'; // <--- ИМПОРТ
 
 export default function EditItemModal({ item, onClose, onSave, saving }) {
   const [tempSize, setTempSize] = useState(item?.size === 'NOT_SELECTED' ? null : item?.size);
@@ -73,7 +28,9 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
       : (item.size_options || []);
   } catch (e) {}
 
-  const isLight = ['white', 'beige', 'cream', 'apricot', 'silver', 'yellow'].some(c => (item.color||'').toLowerCase().includes(c));
+  // Для галочки: черный цвет на светлом фоне
+  const isLight = ['white', 'beige', 'cream', 'apricot', 'silver', 'yellow', 'nude', 'champagne']
+    .some(c => (item.color || '').toLowerCase().includes(c));
 
   return createPortal(
     <div 
@@ -81,9 +38,10 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
         onClick={onClose}
         style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
     >
-      <div className="bg-[#151c28] w-full max-w-sm rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative mt-safe-top" onClick={e => e.stopPropagation()}>
-        
-        {/* Хедер */}
+      <div 
+          className="bg-[#151c28] w-full max-w-sm rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative mt-safe-top" 
+          onClick={e => e.stopPropagation()}
+      >
         <div className="flex gap-4 p-5 border-b border-white/5 bg-[#1a2332]">
           <div className="w-16 h-20 rounded-lg bg-cover bg-center shrink-0 bg-white/5 border border-white/10" style={{backgroundImage: `url('${item.image_url}')`}}></div>
           <div className="flex flex-col justify-center pr-8 min-w-0">
@@ -95,7 +53,6 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           </button>
         </div>
 
-        {/* Контент */}
         <div className="p-5 space-y-5">
           {/* Размер */}
           <div>
@@ -106,7 +63,11 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
             <div className="flex flex-wrap gap-2">
               {sizeOptions.length === 0 ? <p className="text-white/30 text-xs">Нет вариантов</p> : 
                sizeOptions.map((opt, idx) => (
-                <button key={idx} onClick={() => setTempSize(opt.name)} className={`h-10 px-4 min-w-[45px] rounded-xl border text-xs font-bold transition-all ${tempSize === opt.name ? 'bg-white text-black border-white shadow-lg transform scale-105' : 'bg-white/5 border-white/10 text-white/70'}`}>
+                <button 
+                  key={idx} 
+                  onClick={() => setTempSize(opt.name)} 
+                  className={`h-10 px-4 min-w-[45px] rounded-xl border text-xs font-bold transition-all ${tempSize === opt.name ? 'bg-white text-black border-white shadow-lg transform scale-105' : 'bg-white/5 border-white/10 text-white/70'}`}
+                >
                   {opt.name}
                 </button>
               ))}
@@ -122,7 +83,7 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
                 <div 
                   onClick={() => setTempColor(item.color)}
                   className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 ring-1 ring-white/10 ${tempColor === item.color ? 'ring-2 ring-primary ring-offset-2 ring-offset-[#151c28]' : ''}`} 
-                  // ПРИМЕНЯЕМ УМНЫЙ СТИЛЬ
+                  // ИСПОЛЬЗУЕМ УТИЛИТУ ЗДЕСЬ
                   style={getColorStyle(item.color)}
                 >
                   {tempColor === item.color && (
@@ -135,7 +96,6 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           )}
         </div>
 
-        {/* Футер */}
         <div className="p-5 pt-2 bg-[#151c28]">
           <button onClick={handleSave} disabled={saving} className="w-full h-12 bg-primary text-[#102216] font-bold rounded-xl text-sm uppercase shadow-lg active:scale-95 transition-transform">
             {saving ? 'Сохранение...' : 'Применить'}
