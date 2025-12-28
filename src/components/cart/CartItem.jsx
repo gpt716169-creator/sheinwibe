@@ -1,61 +1,5 @@
 import React from 'react';
 
-// --- 1. КАРТА ЦВЕТОВ (Такая же, как в модалке) ---
-const SHEIN_COLOR_MAP = {
-  'burgundy': '#800020',
-  'wine': '#722F37',
-  'navy': '#000080',
-  'navy blue': '#000080',
-  'khaki': '#F0E68C',
-  'camel': '#C19A6B',
-  'beige': '#F5F5DC',
-  'cream': '#FFFDD0',
-  'apricot': '#FDD5B1',
-  'coffee': '#6F4E37',
-  'brown': '#A52A2A',
-  'mint': '#98FF98',
-  'coral': '#FF7F50',
-  'mustard': '#FFDB58',
-  'olive': '#808000',
-  'teal': '#008080',
-  'mauve': '#E0B0FF',
-  'lilac': '#C8A2C8',
-  'rust': '#B7410E',
-  'fuchsia': '#FF00FF',
-  'rose': '#FF007F',
-  'baby blue': '#89CFF0',
-  'royal blue': '#4169E1',
-  'gold': '#FFD700',
-  'silver': '#C0C0C0',
-  'bronze': '#CD7F32',
-  'champagne': '#F7E7CE',
-};
-
-// --- 2. ХЕЛПЕР ДЛЯ СТИЛЕЙ ---
-const getColorStyle = (colorName) => {
-  if (!colorName) return { backgroundColor: 'transparent' };
-  
-  const normalized = colorName.toLowerCase().trim();
-
-  // Градиент для мультиколора
-  if (normalized === 'multicolor' || normalized === 'multi') {
-    return { background: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)' };
-  }
-
-  // Поиск в карте
-  if (SHEIN_COLOR_MAP[normalized]) {
-    return { backgroundColor: SHEIN_COLOR_MAP[normalized] };
-  }
-
-  // Белый цвет
-  if (normalized === 'white') {
-    return { backgroundColor: '#ffffff' };
-  }
-
-  // Стандартный
-  return { backgroundColor: colorName };
-};
-
 export default function CartItem({ 
   item, 
   isSelected, 
@@ -75,7 +19,7 @@ export default function CartItem({
         isWarning ? 'border-red-500/30 bg-red-900/10' : 'bg-[#1c2636] border-white/5'}`}
     >
         
-        {/* === 1. ЧЕКБОКС === */}
+        {/* === 1. ЧЕКБОКС (Выровнен по центру) === */}
         <div className="flex items-center shrink-0">
              <button 
                 onClick={() => inStock && onToggleSelect(item.id)}
@@ -89,13 +33,14 @@ export default function CartItem({
         </div>
 
         {/* === 2. КАРТИНКА === */}
+        {/* Чуть уменьшил ширину (w-18), чтобы дать место тексту */}
         <div 
             onClick={() => inStock && onEdit(item)}
             className="w-18 h-22 rounded-lg bg-cover bg-center shrink-0 bg-white/5 cursor-pointer border border-white/5 relative overflow-hidden" 
             style={{
                 backgroundImage: `url('${item.image_url}')`,
-                width: '4.5rem', 
-                height: '6rem'   
+                width: '4.5rem', // 72px (было 80px)
+                height: '6rem'   // 96px
             }}
         >
              {/* Оверлей "Нет в наличии" */}
@@ -118,6 +63,7 @@ export default function CartItem({
                     {item.product_name}
                  </h3>
                  
+                 {/* Кнопка удаления (Absolute, чтобы не ломать верстку) */}
                  <button 
                     className="absolute top-2 right-2 text-white/20 hover:text-red-400 p-1 z-10 active:scale-90 transition-transform" 
                     onClick={(e) => onDelete(e, item.id)}
@@ -147,11 +93,7 @@ export default function CartItem({
                         {/* Цвет */}
                         {item.color && (
                             <div className="flex items-center gap-1 bg-black/20 border border-white/10 px-1.5 py-0.5 rounded text-[10px] text-white/60">
-                                {/* ПРИМЕНЯЕМ ХЕЛПЕР ЗДЕСЬ */}
-                                <span 
-                                    className="w-2.5 h-2.5 rounded-full border border-white/20 shadow-sm" 
-                                    style={getColorStyle(item.color)}
-                                ></span>
+                                <span className="w-2 h-2 rounded-full border border-white/20" style={{backgroundColor: item.color.toLowerCase() === 'white' ? '#fff' : item.color}}></span>
                                 <span className="max-w-[50px] truncate">{item.color}</span>
                             </div>
                         )}
@@ -162,10 +104,12 @@ export default function CartItem({
             {/* Низ: Цена и Количество */}
             {inStock && (
                 <div className="flex justify-between items-end mt-2">
+                    {/* Цена: Убрал truncate, теперь она перенесется или расширится */}
                     <span className="text-primary font-bold text-sm whitespace-nowrap mr-2">
                         {(item.final_price_rub * item.quantity).toLocaleString()} ₽
                     </span>
                     
+                    {/* Кнопки +/- */}
                     <div className="flex items-center gap-1 bg-[#151c28] rounded-lg p-0.5 border border-white/10 shrink-0 shadow-sm">
                         <button 
                             className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 rounded-md transition-colors" 
