@@ -1,10 +1,19 @@
 import React from 'react';
-import { getColorStyle } from '../../utils/colorUtils'; // <--- ИМПОРТ
+// Импортируем нашу утилиту. 
+// ПРОВЕРЬ ПУТЬ: если папка utils лежит в src/utils, а этот файл в src/components/cart, то путь верный.
+import { getColorStyle } from '../../utils/colorUtils'; 
 
 export default function CartItem({ 
-  item, isSelected, onToggleSelect, onEdit, onDelete, onUpdateQuantity 
+  item, 
+  isSelected, 
+  onToggleSelect, 
+  onEdit, 
+  onDelete, 
+  onUpdateQuantity 
 }) {
+  // Проверка наличия
   const inStock = item.is_in_stock !== false;
+  // Ворнинг, если не выбран размер (только для товаров в наличии)
   const isWarning = (item.size === 'NOT_SELECTED' || !item.size) && inStock;
 
   return (
@@ -12,6 +21,8 @@ export default function CartItem({
       ${!inStock ? 'bg-black/40 border-white/5 opacity-60 grayscale-[0.5]' : 
         isWarning ? 'border-red-500/30 bg-red-900/10' : 'bg-[#1c2636] border-white/5'}`}
     >
+        
+        {/* === 1. ЧЕКБОКС === */}
         <div className="flex items-center shrink-0">
              <button 
                 onClick={() => inStock && onToggleSelect(item.id)}
@@ -24,8 +35,17 @@ export default function CartItem({
              </button>
         </div>
 
-        <div onClick={() => inStock && onEdit(item)} className="w-18 h-22 rounded-lg bg-cover bg-center shrink-0 bg-white/5 cursor-pointer border border-white/5 relative overflow-hidden" 
-            style={{ backgroundImage: `url('${item.image_url}')`, width: '4.5rem', height: '6rem' }}>
+        {/* === 2. КАРТИНКА === */}
+        <div 
+            onClick={() => inStock && onEdit(item)}
+            className="w-18 h-22 rounded-lg bg-cover bg-center shrink-0 bg-white/5 cursor-pointer border border-white/5 relative overflow-hidden" 
+            style={{
+                backgroundImage: `url('${item.image_url}')`,
+                width: '4.5rem', 
+                height: '6rem'   
+            }}
+        >
+             {/* Оверлей "Нет в наличии" */}
              {!inStock && (
                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
                      <span className="material-symbols-outlined text-white/50 text-2xl">block</span>
@@ -33,16 +53,27 @@ export default function CartItem({
              )}
         </div>
 
+        {/* === 3. КОНТЕНТ === */}
         <div className="flex flex-col justify-between flex-1 py-0.5 min-w-0">
+            
+            {/* Верх: Имя и Кнопка удаления */}
             <div className="flex justify-between items-start gap-2">
-                 <h3 onClick={() => inStock && onEdit(item)} className={`text-white text-xs leading-snug font-medium line-clamp-2 pr-6 ${!inStock && 'line-through text-white/50'}`}>
+                 <h3 
+                    onClick={() => inStock && onEdit(item)}
+                    className={`text-white text-xs leading-snug font-medium line-clamp-2 pr-6 ${!inStock && 'line-through text-white/50'}`}
+                 >
                     {item.product_name}
                  </h3>
-                 <button className="absolute top-2 right-2 text-white/20 hover:text-red-400 p-1 z-10 active:scale-90 transition-transform" onClick={(e) => onDelete(e, item.id)}>
+                 
+                 <button 
+                    className="absolute top-2 right-2 text-white/20 hover:text-red-400 p-1 z-10 active:scale-90 transition-transform" 
+                    onClick={(e) => onDelete(e, item.id)}
+                >
                     <span className="material-symbols-outlined text-lg">close</span>
                 </button>
             </div>
             
+            {/* Середина: Параметры (Размер/Цвет) */}
             <div onClick={() => inStock && onEdit(item)} className={`mt-1.5 ${inStock ? 'cursor-pointer group/edit' : ''}`}>
                 {!inStock ? (
                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-bold uppercase tracking-wider text-white/40">
@@ -55,16 +86,20 @@ export default function CartItem({
                     </div>
                 ) : (
                     <div className="flex flex-wrap gap-2">
+                        {/* Размер */}
                         <div className="flex items-center gap-1 bg-black/20 border border-white/10 px-1.5 py-0.5 rounded text-[10px] text-white/80 group-hover/edit:border-primary/50 transition-colors">
                             <span className="font-mono font-bold">{item.size}</span>
                             <span className="material-symbols-outlined text-[10px] opacity-50">expand_more</span>
                         </div>
+                        
+                        {/* Цвет */}
                         {item.color && (
                             <div className="flex items-center gap-1 bg-black/20 border border-white/10 px-1.5 py-0.5 rounded text-[10px] text-white/60">
                                 {/* ИСПОЛЬЗУЕМ УТИЛИТУ ЗДЕСЬ */}
+                                {/* style={{ background: ... }} поддерживает и цвета, и градиенты */}
                                 <span 
                                     className="w-2.5 h-2.5 rounded-full border border-white/20 shadow-sm" 
-                                    style={getColorStyle(item.color)}
+                                    style={{ background: getColorStyle(item.color) }}
                                 ></span>
                                 <span className="max-w-[50px] truncate">{item.color}</span>
                             </div>
@@ -73,15 +108,27 @@ export default function CartItem({
                 )}
             </div>
 
+            {/* Низ: Цена и Количество */}
             {inStock && (
                 <div className="flex justify-between items-end mt-2">
                     <span className="text-primary font-bold text-sm whitespace-nowrap mr-2">
                         {(item.final_price_rub * item.quantity).toLocaleString()} ₽
                     </span>
+                    
                     <div className="flex items-center gap-1 bg-[#151c28] rounded-lg p-0.5 border border-white/10 shrink-0 shadow-sm">
-                        <button className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 rounded-md transition-colors" onClick={() => onUpdateQuantity(item.id, -1)}>−</button>
+                        <button 
+                            className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 rounded-md transition-colors" 
+                            onClick={() => onUpdateQuantity(item.id, -1)}
+                        >
+                            −
+                        </button>
                         <span className="text-xs w-4 text-center text-white font-bold select-none">{item.quantity}</span>
-                        <button className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 rounded-md transition-colors" onClick={() => onUpdateQuantity(item.id, 1)}>+</button>
+                        <button 
+                            className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 rounded-md transition-colors" 
+                            onClick={() => onUpdateQuantity(item.id, 1)}
+                        >
+                            +
+                        </button>
                     </div>
                 </div>
             )}
