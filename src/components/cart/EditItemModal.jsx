@@ -1,11 +1,72 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom'; // <--- ВАЖНЫЙ ИМПОРТ
+import { createPortal } from 'react-dom';
+
+// --- 1. КАРТА ЦВЕТОВ SHEIN ---
+// Переводим названия в HEX. Можно дополнять по мере необходимости.
+const SHEIN_COLOR_MAP = {
+  // Базовые сложные
+  'burgundy': '#800020',
+  'wine': '#722F37',
+  'navy': '#000080',
+  'navy blue': '#000080',
+  'khaki': '#F0E68C', // Или более модный #C3B091
+  'camel': '#C19A6B',
+  'beige': '#F5F5DC',
+  'cream': '#FFFDD0',
+  'apricot': '#FDD5B1',
+  'coffee': '#6F4E37',
+  'brown': '#A52A2A',
+  
+  // Пастельные и яркие
+  'mint': '#98FF98',
+  'coral': '#FF7F50',
+  'mustard': '#FFDB58',
+  'olive': '#808000',
+  'teal': '#008080',
+  'mauve': '#E0B0FF',
+  'lilac': '#C8A2C8',
+  'rust': '#B7410E',
+  'fuchsia': '#FF00FF',
+  'rose': '#FF007F',
+  'baby blue': '#89CFF0',
+  'royal blue': '#4169E1',
+  
+  // Металлы
+  'gold': '#FFD700',
+  'silver': '#C0C0C0',
+  'bronze': '#CD7F32',
+  'champagne': '#F7E7CE',
+};
+
+// Хелпер для определения стиля фона
+const getColorStyle = (colorName) => {
+  if (!colorName) return { backgroundColor: 'transparent' };
+  
+  const normalized = colorName.toLowerCase().trim();
+
+  // 1. Особая обработка для "Multicolor" (Разноцветный)
+  if (normalized === 'multicolor' || normalized === 'multi') {
+    return { background: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)' };
+  }
+
+  // 2. Если есть в нашей карте - берем оттуда
+  if (SHEIN_COLOR_MAP[normalized]) {
+    return { backgroundColor: SHEIN_COLOR_MAP[normalized] };
+  }
+
+  // 3. Если цвет "White" - делаем чисто белым (можно добавить border в компоненте)
+  if (normalized === 'white') {
+    return { backgroundColor: '#ffffff' };
+  }
+
+  // 4. Иначе пробуем использовать то, что пришло (для стандартных red, blue, hex-кодов)
+  return { backgroundColor: colorName };
+};
 
 export default function EditItemModal({ item, onClose, onSave, saving }) {
   const [tempSize, setTempSize] = useState(item?.size === 'NOT_SELECTED' ? null : item?.size);
   const [tempColor, setTempColor] = useState(item?.color);
 
-  // Блокируем скролл основной страницы, пока открыто окно
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => document.body.style.overflow = 'auto';
@@ -28,14 +89,11 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
       : (item.size_options || []);
   } catch (e) {}
 
-  // --- ВОТ ГЛАВНОЕ ИЗМЕНЕНИЕ ---
-  // Мы используем createPortal, чтобы рендерить это окно ПРЯМО В BODY,
-  // минуя все родительские блоки, скроллы и трансформации.
   return createPortal(
     <div 
         className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 px-4 bg-black/80 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
-        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }} // Дублируем стили для надежности
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
     >
       <div 
           className="bg-[#151c28] w-full max-w-sm rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative mt-safe-top" 
@@ -79,13 +137,25 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           {/* Цвет */}
           {item.color && (
              <div>
-                <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold mb-3">Цвет</h4>
+                <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold mb-3">
+                    Цвет: <span className="text-white normal-case">{item.color}</span>
+                </h4>
                 <div 
                   onClick={() => setTempColor(item.color)}
-                  className={`w-12 h-12 rounded-full border-2 flex items-center justify-center cursor-pointer ${tempColor === item.color ? 'border-primary' : 'border-white/10'}`} 
-                  style={{backgroundColor: item.color.toLowerCase() === 'white' ? '#fff' : item.color}}
+                  className={`w-12 h-12 rounded-full border-2 flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${tempColor === item.color ? 'border-primary shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'border-white/10'}`} 
+                  // --- ВОТ ЗДЕСЬ МЫ ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ ---
+                  style={getColorStyle(item.color)}
                 >
-                  {tempColor === item.color && <span className="material-symbols-outlined text-black/50 font-bold">check</span>}
+                  {/* Меняем цвет галочки для темных/светлых фонов */}
+                  {tempColor === item.color && (
+                    <span className={`material-symbols-outlined text-lg font-bold drop-shadow-md ${
+                        ['white', 'beige', 'cream', 'apricot', 'silver', 'yellow'].includes(item.color.toLowerCase()) 
+                        ? 'text-black' 
+                        : 'text-white'
+                    }`}>
+                        check
+                    </span>
+                  )}
                 </div>
              </div>
           )}
@@ -99,6 +169,6 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
         </div>
       </div>
     </div>,
-    document.body // <-- ВОТ КЛЮЧ: Рендерим прямо в body
+    document.body 
   );
 }
