@@ -1,25 +1,20 @@
 export const getColorStyle = (colorName) => {
     if (!colorName) return '#ccc'; // Fallback
 
-    const lower = String(colorName).toLowerCase().replace('-', ' ').trim();
+    const lower = colorName.toLowerCase().replace('-', ' ').trim();
 
     const colorMap = {
         'burgundy': '#800020',
-        'wine': '#722F37',
-        'maroon': '#800000',
         'navy blue': '#000080',
         'navy': '#000080',
         'beige': '#F5F5DC',
-        'khaki': '#F0E68C', // Или #C3B091
+        'khaki': '#F0E68C',
         'camel': '#C19A6B',
         'coffee': '#6F4E37',
-        'brown': '#A52A2A',
         'teal': '#008080',
         'grey': '#808080',
         'gray': '#808080',
         'off white': '#FAF9F6',
-        'white': '#FFFFFF',
-        'black': '#000000',
         'cream': '#FFFDD0',
         'mustard': '#FFDB58',
         'olive': '#808000',
@@ -40,27 +35,20 @@ export const getColorStyle = (colorName) => {
         'tan': '#D2B48C',
         'taupe': '#483C32',
         'turquoise': '#40E0D0',
-        'gold': '#FFD700',
-        'silver': '#C0C0C0',
-        'rose gold': '#B76E79',
-        // Добавляем специфичные для Shein варианты
-        'multicolor': 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)',
-        'multi': 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)'
+        // Добавляем специфичные для Shein варианты, если нужно
+        'multicolor': 'linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet)'
     };
 
-    // 1. Если есть в мапе - возвращаем hex
+    // Если есть в мапе - возвращаем hex
     if (colorMap[lower]) {
         return colorMap[lower];
     }
 
-    // 2. Проверка на вхождение (для сложных названий типа "Deep Burgundy")
-    const keys = Object.keys(colorMap);
-    for (const key of keys) {
-        if (lower.includes(key)) {
-            return colorMap[key];
-        }
+    // Если это Multicolor - возвращаем градиент
+    if (lower.includes('multicolor') || lower.includes('multi')) {
+        return 'linear-gradient(45deg, #ff0000, #00ff00, #0000ff)';
     }
 
-    // 3. По умолчанию возвращаем как есть (на случай если это валидный цвет типа "red" или hex)
+    // По умолчанию возвращаем как есть (на случай если это валидный цвет типа "red" или hex)
     return colorName;
 };
