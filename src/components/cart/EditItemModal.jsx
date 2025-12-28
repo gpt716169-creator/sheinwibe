@@ -28,9 +28,8 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
       : (item.size_options || []);
   } catch (e) {}
 
-  // Для галочки: черный цвет на светлом фоне
-  const isLight = ['white', 'beige', 'cream', 'apricot', 'silver', 'yellow', 'nude', 'champagne']
-    .some(c => (item.color || '').toLowerCase().includes(c));
+  // Проверка для цвета галочки (черная на светлом, белая на темном)
+  const isLightColor = ['white', 'beige', 'cream', 'apricot', 'silver', 'yellow', 'ivory', 'off white'].some(c => (item.color || '').toLowerCase().includes(c));
 
   return createPortal(
     <div 
@@ -42,6 +41,8 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           className="bg-[#151c28] w-full max-w-sm rounded-3xl border border-white/10 overflow-hidden flex flex-col shadow-2xl relative mt-safe-top" 
           onClick={e => e.stopPropagation()}
       >
+        
+        {/* Хедер */}
         <div className="flex gap-4 p-5 border-b border-white/5 bg-[#1a2332]">
           <div className="w-16 h-20 rounded-lg bg-cover bg-center shrink-0 bg-white/5 border border-white/10" style={{backgroundImage: `url('${item.image_url}')`}}></div>
           <div className="flex flex-col justify-center pr-8 min-w-0">
@@ -53,6 +54,7 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           </button>
         </div>
 
+        {/* Контент */}
         <div className="p-5 space-y-5">
           {/* Размер */}
           <div>
@@ -80,14 +82,17 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
                 <h4 className="text-[10px] uppercase tracking-wider text-white/50 font-bold mb-3">
                     Цвет: <span className="text-white normal-case font-normal ml-1">{item.color}</span>
                 </h4>
+                
                 <div 
                   onClick={() => setTempColor(item.color)}
+                  // Добавил ring-1 ring-white/10, чтобы белый цвет был виден на белом фоне
                   className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-transform active:scale-95 ring-1 ring-white/10 ${tempColor === item.color ? 'ring-2 ring-primary ring-offset-2 ring-offset-[#151c28]' : ''}`} 
-                  // ИСПОЛЬЗУЕМ УТИЛИТУ ЗДЕСЬ
-                  style={getColorStyle(item.color)}
+                  // --- ВОТ ГЛАВНОЕ ИЗМЕНЕНИЕ ---
+                  // Используем background вместо backgroundColor, как в твоем рабочем примере
+                  style={{ background: getColorStyle(item.color) }}
                 >
                   {tempColor === item.color && (
-                    <span className={`material-symbols-outlined text-lg font-bold drop-shadow-sm ${isLight ? 'text-black' : 'text-white'}`}>
+                    <span className={`material-symbols-outlined text-lg font-bold drop-shadow-sm ${isLightColor ? 'text-black' : 'text-white'}`}>
                         check
                     </span>
                   )}
@@ -96,6 +101,7 @@ export default function EditItemModal({ item, onClose, onSave, saving }) {
           )}
         </div>
 
+        {/* Футер */}
         <div className="p-5 pt-2 bg-[#151c28]">
           <button onClick={handleSave} disabled={saving} className="w-full h-12 bg-primary text-[#102216] font-bold rounded-xl text-sm uppercase shadow-lg active:scale-95 transition-transform">
             {saving ? 'Сохранение...' : 'Применить'}
