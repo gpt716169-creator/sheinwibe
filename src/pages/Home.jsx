@@ -108,7 +108,7 @@ export default function Home({ user, dbUser, setActiveTab }) {
               window.Telegram?.WebApp?.showAlert('Ошибка: Не удалось найти товар');
           }
       } catch (e) {
-          window.Telegram?.WebApp?.showAlert('Ошибка сети');
+          window.Telegram?.WebApp?.showAlert('Товара нет в наличии. Рекомендуем поставить Киргизию в настройках SHEIN');
       } finally {
           window.Telegram?.WebApp?.MainButton.hideProgress();
       }
