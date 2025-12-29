@@ -113,7 +113,7 @@ export default function Cart({ user, dbUser, setActiveTab, onRefreshData }) {
     try {
       const res = await fetch(`https://proshein.com/webhook/get-cart?user_id=${user?.id}`);
       
-      if (!res.ok) throw new Error('Ошибка сети');
+      if (!res.ok) throw new Error('Товара нет в наличии. Рекомендуем поставить Киргизию в настройках SHEIN');
       
       const jsonResponse = await res.json();
       
